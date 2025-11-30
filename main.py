@@ -224,11 +224,12 @@ def main():
         return
 
     body = build_email_body(matches)
-    subject = f"[Hibrain] 지정 대학교 임용 공지 링크 감지 (최대 {MAX_LINKS}개)"
+    subject = f"[Hibrain] 지정 대학교 임용 공지알리미(최대 링크{MAX_LINKS}개)"
 
     print("=== 이메일 미리보기 ===")
     print("Subject:", subject)
     print(body)
+    print("GitHub Repository: https://github.com/leemgs/hibrain-prof-notifier")
     print("=======================")
 
     send_email(subject, body)
