@@ -5,18 +5,16 @@ import os
 import json
 import smtplib
 from email.mime.text import MIMEText
+from urllib.parse import urljoin, urlparse
 
 import requests
 from bs4 import BeautifulSoup
 
-HIBRAIN_URL = None  # loaded from config.txt
+# ----------------------------------------------------------------------
+# 설정 로딩
+# ----------------------------------------------------------------------
 
-# 키워드 주변에서 URL을 찾을 때 사용할 검색 윈도우 크기 (앞뒤 1000자)
-URL_SEARCH_WINDOW = 1000
-
-
-
-def load_config(path="config.json"):
+def load_config(path: str = "config.json"):
     with open(path, encoding="utf-8") as f:
         data = json.load(f)
     return data
@@ -25,9 +23,11 @@ CONFIG = load_config()
 USER_AGENT = CONFIG.get("browser_user_agent")
 CONFIG_URLS = CONFIG.get("web_addresses", [])
 MAX_LINKS = CONFIG.get("max_links", 2)
-HIBRAIN_URL = None
 
 
+# ----------------------------------------------------------------------
+# 키워드 로딩
+# ----------------------------------------------------------------------
 
 def load_keywords(path: str = "keywords.txt"):
     """keywords.txt에서 키워드 목록을 읽어온다."""
@@ -40,99 +40,124 @@ def load_keywords(path: str = "keywords.txt"):
     return keywords
 
 
-def fetch_page(url: str) -> str:
-    headers={"User-Agent": USER_AGENT}
-    resp=requests.get(url,headers=headers,timeout=15)
-    resp.raise_for_status()
-    resp.encoding=resp.apparent_encoding
-    return resp.text
+# ----------------------------------------------------------------------
+# HTML 가져오기
+# ----------------------------------------------------------------------
 
-
-def find_closest_urls_for_keyword(html: str, keyword: str, max_links: int = 2):
+def fetch_page(url: str) -> str | None:
     """
-    HTML 문자열에서 keyword가 등장하는 위치 주변에서
-    <a href="https://..."> 형태의 URL 중
-    keyword와의 문자 거리(absolute offset difference)가 가장 가까운 것들을
-    최대 max_links 개까지 반환한다.
+    주어진 URL에서 HTML을 가져온다.
+    - 실제 브라우저와 유사한 헤더를 사용.
+    - 200 OK가 아니거나 예외가 발생하면 None을 반환하고 로그만 출력한다.
     """
-    candidates = []  # (distance, href) 목록
+    if not url:
+        return None
 
-    start = 0
-    html_len = len(html)
+    headers = {
+        "User-Agent": USER_AGENT,
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
+        "Accept-Language": "ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7",
+        "Accept-Encoding": "gzip, deflate, br",
+        "Connection": "keep-alive",
+        "Upgrade-Insecure-Requests": "1",
+        "Sec-Fetch-Site": "none",
+        "Sec-Fetch-Mode": "navigate",
+        "Sec-Fetch-User": "?1",
+        "Sec-Fetch-Dest": "document",
+    }
 
-    while True:
-        idx = html.find(keyword, start)
-        if idx == -1:
-            break
+    try:
+        resp = requests.get(url, headers=headers, timeout=15)
+        if resp.status_code != 200:
+            print(f"[WARN] 요청 실패: {url} (status={resp.status_code})")
+            return None
+        resp.encoding = resp.apparent_encoding
+        return resp.text
+    except Exception as e:
+        print(f"[ERROR] 요청 중 예외 발생: {url} ({e})")
+        return None
 
-        # 키워드 기준 앞뒤로 일정 구간만 잘라서 URL 검색
-        window_start = max(0, idx - URL_SEARCH_WINDOW)
-        window_end = min(html_len, idx + len(keyword) + URL_SEARCH_WINDOW)
-        window = html[window_start:window_end]
 
-        # 키워드의 window 내 상대 위치
-        keyword_pos_in_window = idx - window_start
+# ----------------------------------------------------------------------
+# 키워드 기준으로 <a> 텍스트 매칭 + 상대경로 → 절대 URL 변환
+# ----------------------------------------------------------------------
 
-        soup = BeautifulSoup(window, "html.parser")
-
-        for a in soup.find_all("a", href=True):
-            href = a["href"].strip()
-            # 절대 URL이면서 https:// 로 시작하는 경우만 사용
-            if not href.startswith("https://"):
-                continue
-
-            a_str = str(a)
-            pos_in_window = window.find(a_str)
-            if pos_in_window == -1:
-                # 파서가 문자열을 약간 변경했을 수 있으므로, 실패 시 건너뜀
-                continue
-
-            a_center = pos_in_window + len(a_str) // 2
-            distance = abs(a_center - keyword_pos_in_window)
-
-            candidates.append((distance, href))
-
-        start = idx + len(keyword)
-
-    if not candidates:
-        return []
-
-    # 거리 기준 정렬 후, href 기준으로 중복 제거하면서 상위 max_links 개 추출
-    candidates.sort(key=lambda x: x[0])
-
-    selected = []
+def find_keyword_links_in_html(html: str, base_url: str, keyword: str, max_links: int = 2):
+    """
+    BeautifulSoup으로 파싱한 후, <a> 태그의 텍스트에 키워드가 포함된 링크를 찾는다.
+    - HTML 소스에서 태그로 인해 단어가 분리된 경우에도 get_text()로 자연스럽게 붙으므로
+      "경희대학교"처럼 한글 대학명이 span 등으로 갈라져 있어도 탐지가 가능하다.
+    - href가 상대경로(/recruitment/...)여도 base_url을 기준으로 절대 URL로 변환한다.
+    - 각 키워드당 최대 max_links 개까지만 반환한다.
+    """
+    soup = BeautifulSoup(html, "html.parser")
+    results = []
     seen = set()
-    for dist, href in candidates:
-        if href in seen:
+
+    # base_url에서 scheme+netloc 추출 (https://m.hibrain.net)
+    parsed = urlparse(base_url)
+    origin = f"{parsed.scheme}://{parsed.netloc}"
+
+    for a in soup.find_all("a", href=True):
+        raw_href = a["href"].strip()
+        if not raw_href:
             continue
-        selected.append(href)
-        seen.add(href)
-        if len(selected) >= max_links:
-            break
 
-    return selected
+        # javascript:, mailto: 등은 스킵
+        lower = raw_href.lower()
+        if lower.startswith("javascript:") or lower.startswith("mailto:") or lower.startswith("#"):
+            continue
 
+        # 절대/상대 URL 모두 허용 → 절대 URL로 변환
+        # - raw_href가 http로 시작하면 그대로 사용
+        # - 그렇지 않으면 base_url 기준으로 urljoin
+        href_abs = raw_href
+        if not (raw_href.startswith("http://") or raw_href.startswith("https://")):
+            # origin 기준으로 조합 (예: /recruitment/... → https://m.hibrain.net/recruitment/...)
+            href_abs = urljoin(origin, raw_href)
+
+        # <a> 텍스트에서 키워드 검색
+        text = a.get_text(" ", strip=True)
+        if not text:
+            continue
+
+        if keyword in text:
+            if href_abs not in seen:
+                results.append(href_abs)
+                seen.add(href_abs)
+                if len(results) >= max_links:
+                    break
+
+    return results
+
+
+# ----------------------------------------------------------------------
+# 이메일 본문 생성
+# ----------------------------------------------------------------------
 
 def build_email_body(matches):
     """
     matches: { keyword: [url1, url2, ...], ... } 형태
-    (각 키워드당 최대 2개 URL)
+    (각 키워드당 최대 MAX_LINKS 개 URL)
     """
     lines = []
     lines.append("[Hibrain 임용 알리미] 지정 키워드 신규 감지 결과\n")
-    lines.append(f"대상 페이지: {HIBRAIN_URL}\n")
 
     for kw, urls in matches.items():
         lines.append(f"■ 키워드: {kw}")
         if urls:
             for i, u in enumerate(urls, start=1):
-                lines.append(f"  - 가까운 링크 {i}: {u}")
+                lines.append(f"  - 관련 링크 {i}: {u}")
         else:
-            lines.append("  - (키워드 주변에서 https:// 링크를 찾지 못했습니다.)")
+            lines.append("  - (키워드 주변에서 링크를 찾지 못했습니다.)")
         lines.append("")  # 빈 줄
 
     return "\n".join(lines)
 
+
+# ----------------------------------------------------------------------
+# 이메일 발송
+# ----------------------------------------------------------------------
 
 def send_email(subject: str, body: str):
     """
@@ -158,19 +183,41 @@ def send_email(subject: str, body: str):
     print("이메일 발송 완료")
 
 
+# ----------------------------------------------------------------------
+# 메인 로직
+# ----------------------------------------------------------------------
+
 def main():
     keywords = load_keywords()
     print(f"로드된 키워드: {keywords}")
 
-    html_pages = [fetch_page(u) for u in CONFIG_URLS]
-    print("페이지 다운로드 완료")
+    # 1) 각 URL에서 HTML 가져오기
+    html_pages: list[tuple[str, str]] = []  # (base_url, html)
 
-    matches = {}  # { keyword: [url1, url2, ...] }
+    for u in CONFIG_URLS:
+        html = fetch_page(u)
+        if html:
+            html_pages.append((u, html))
+        else:
+            print(f"[WARN] HTML을 가져오지 못해 건너뜀: {u}")
+
+    if not html_pages:
+        print("[WARN] 어떤 URL에서도 HTML을 가져오지 못했습니다. 이메일을 보내지 않습니다.")
+        return
+
+    # 2) 키워드별 링크 수집
+    matches: dict[str, list[str]] = {}
 
     for kw in keywords:
-        urls = find_closest_urls_for_keyword(html, kw, max_links=MAX_LINKS)
-        if urls:
-            matches[kw] = urls
+        for base_url, html in html_pages:
+            urls = find_keyword_links_in_html(html, base_url, kw, max_links=MAX_LINKS)
+            if urls:
+                matches.setdefault(kw, []).extend(urls)
+
+    # 3) 키워드별로 중복 제거 및 max_links 제한
+    for k in list(matches.keys()):
+        dedup = list(dict.fromkeys(matches[k]))  # 순서 유지하며 중복 제거
+        matches[k] = dedup[:MAX_LINKS]
 
     if not matches:
         print("키워드를 포함한 신규 공지/링크를 찾지 못했습니다. 이메일을 보내지 않습니다.")
@@ -189,3 +236,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
