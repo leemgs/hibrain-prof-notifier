@@ -1,11 +1,11 @@
-# Hibrain 교수 임용 알리미 (GitHub Actions + Gmail)
+# Hibrain 교수 임용 소식 알리미 (GitHub Actions + Gmail)
 
 지정한 대학교 이름(키워드)이 **Hibrain 채용 페이지**에 등장하면,  
 키워드 주변의 HTML을 분석해서 **해당 키워드와 가장 가까운 `<a href="https://...">` 링크 최대 2개**를 골라  
 이를 **Gmail로 알림 메일**로 보내는 GitHub Actions용 레포입니다.
 
 - 대상 페이지: https://m.hibrain.net/recruitment
-- 실행 주기: **4시간마다 자동 실행** (GitHub Actions cron)
+- 실행 주기: ** x시간마다 자동 실행** (GitHub Actions cron)
 - 알림 방식: Gmail SMTP를 이용해 메일 발송
 - 링크 추출: HTML을 BeautifulSoup으로 파싱하고,  
   각 키워드에 대해 **문자 거리 기준으로 가장 가까운 링크 2개까지 선택**
