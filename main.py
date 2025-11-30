@@ -2,16 +2,31 @@
 # -*- coding: utf-8 -*-
 
 import os
+import json
 import smtplib
 from email.mime.text import MIMEText
 
 import requests
 from bs4 import BeautifulSoup
 
-HIBRAIN_URL = "https://m.hibrain.net/recruitment"
+HIBRAIN_URL = None  # loaded from config.txt
 
 # 키워드 주변에서 URL을 찾을 때 사용할 검색 윈도우 크기 (앞뒤 1000자)
 URL_SEARCH_WINDOW = 1000
+
+
+
+def load_config(path="config.json"):
+    with open(path, encoding="utf-8") as f:
+        data = json.load(f)
+    return data
+
+CONFIG = load_config()
+USER_AGENT = CONFIG.get("browser_user_agent")
+CONFIG_URLS = CONFIG.get("web_addresses", [])
+MAX_LINKS = CONFIG.get("max_links", 2)
+HIBRAIN_URL = None
+
 
 
 def load_keywords(path: str = "keywords.txt"):
@@ -26,14 +41,10 @@ def load_keywords(path: str = "keywords.txt"):
 
 
 def fetch_page(url: str) -> str:
-    """Hibrain recruitment 페이지 HTML을 가져온다."""
-    headers = {
-        "User-Agent": "Mozilla/5.0 (compatible; HibrainNotifier/1.3; +https://github.com/yourid)"
-    }
-    resp = requests.get(url, headers=headers, timeout=15)
+    headers={"User-Agent": USER_AGENT}
+    resp=requests.get(url,headers=headers,timeout=15)
     resp.raise_for_status()
-    # 사이트가 UTF-8이 아닐 수도 있으므로, 서버 헤더/내용 기반 인코딩 추정
-    resp.encoding = resp.apparent_encoding
+    resp.encoding=resp.apparent_encoding
     return resp.text
 
 
@@ -151,13 +162,13 @@ def main():
     keywords = load_keywords()
     print(f"로드된 키워드: {keywords}")
 
-    html = fetch_page(HIBRAIN_URL)
+    html_pages = [fetch_page(u) for u in CONFIG_URLS]
     print("페이지 다운로드 완료")
 
     matches = {}  # { keyword: [url1, url2, ...] }
 
     for kw in keywords:
-        urls = find_closest_urls_for_keyword(html, kw, max_links=2)
+        urls = find_closest_urls_for_keyword(html, kw, max_links=MAX_LINKS)
         if urls:
             matches[kw] = urls
 
@@ -166,7 +177,7 @@ def main():
         return
 
     body = build_email_body(matches)
-    subject = "[Hibrain] 지정 대학교 임용 공지 링크 감지 (최대 2개)"
+    subject = f"[Hibrain] 지정 대학교 임용 공지 링크 감지 (최대 {MAX_LINKS}개)"
 
     print("=== 이메일 미리보기 ===")
     print("Subject:", subject)
