@@ -49,17 +49,19 @@ def fetch_page(url: str) -> str | None:
     parsed = urlparse(url)
     origin = f"{parsed.scheme}://{parsed.netloc}"
 
+    # ⭐ User-Agent를 최신 일반 브라우저로 변경
     ua = USER_AGENT or (
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
         "AppleWebKit/537.36 (KHTML, like Gecko) "
-        "Chrome/129.0.0.0 Safari/537.36"
+        "Chrome/129.0.6647.44 Safari/537.36" 
     )
 
     headers = {
         "User-Agent": ua,
         "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
         "Accept-Language": "ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7",
-        "Referer": origin + "/recruitment",
+        # ⭐ Referer를 간단히 루트로 설정하여 회피 시도
+        "Referer": origin + "/", 
         "Connection": "keep-alive",
     }
 
