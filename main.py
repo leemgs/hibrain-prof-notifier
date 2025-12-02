@@ -49,7 +49,7 @@ def load_keywords(path: str = "keywords.txt"):
     return keywords
 
 # ---------------------------------------------------------
-# HTML 가져오기
+# HTML 가져오기 (403 완화 핵심)
 # ---------------------------------------------------------
 
 def fetch_page(url: str, max_retries: int = 3) -> str | None:
@@ -57,9 +57,9 @@ def fetch_page(url: str, max_retries: int = 3) -> str | None:
     if not url:
         return None
 
-    # hibrain은 모바일(m)에서 차단이 훨씬 덜함 — 자동 변환
-    parsed = urlparse(url)
-    if parsed.netloc == "www.hibrain.net":
+    # 모바일 도메인으로 자동 전환
+    parsed_for_domain = urlparse(url)
+    if parsed_for_domain.netloc == "www.hibrain.net":
         mobile_url = url.replace("://www.", "://m.")
         print(f"[INFO] www.hibrain.net 대신 모바일 도메인으로 시도: {mobile_url}")
         url = mobile_url
@@ -70,9 +70,24 @@ def fetch_page(url: str, max_retries: int = 3) -> str | None:
         "AppleWebKit/537.36 (KHTML, like Gecko) "
         "Chrome/100.0.4896.127 Safari/537.36"
     )
-    SESSION.headers["User-Agent"] = ua
 
-    # 재시도 로직
+    parsed = urlparse(url)
+    origin = f"{parsed.scheme}://{parsed.netloc}"
+
+    # 브라우저와 최대한 비슷한 헤더 세팅
+    SESSION.headers.update({
+        "User-Agent": ua,
+        "Referer": origin + "/recruitment",
+        "Origin": origin,
+        "Upgrade-Insecure-Requests": "1",
+        "Sec-Fetch-Site": "same-origin",
+        "Sec-Fetch-Mode": "navigate",
+        "Sec-Fetch-Dest": "document",
+        "Sec-Fetch-User": "?1",
+        "Accept-Encoding": "gzip, deflate, br",
+    })
+
+    # 재시도
     for attempt in range(1, max_retries + 1):
         try:
             resp = SESSION.get(url, timeout=15)
@@ -105,7 +120,7 @@ def fetch_page(url: str, max_retries: int = 3) -> str | None:
 # ---------------------------------------------------------
 
 def extract_period(a_tag: Tag) -> str:
-    """주어진 <a> 태그를 포함하는 <li> 태그에서 모집 기간을 추출한다."""
+    """<a> 태그가 속한 <li>에서 모집 기간을 추출."""
     li_row = a_tag.find_parent("li", class_="row sortRoot")
     if not li_row:
         return "(모집기간 정보 없음)"
@@ -121,73 +136,58 @@ def extract_period(a_tag: Tag) -> str:
         elif isinstance(content, Tag) and 'specialCharacter' in content.get('class', []):
             period_parts.append('~')
         elif isinstance(content, str):
-            text = content.strip()
-            if text and text != '&nbsp;~&nbsp;':
-                period_parts.append(text)
+            t = content.strip()
+            if t and t != '&nbsp;~&nbsp;':
+                period_parts.append(t)
 
-    period_str = "".join(period_parts).replace('~~', '~').strip()
-    
-    if period_str and '~' in period_str:
+    period_str = "".join(period_parts).replace("~~", "~").strip()
+    if period_str and "~" in period_str:
         return period_str
-    
+
     return "(모집기간 정보 없음)"
 
 
 def find_keyword_links_in_html(html: str, base_url: str, keyword: str, max_links: int = 2):
-    """HTML 본문에서 키워드가 포함된 <a> 링크와 모집 기간을 찾는다."""
     soup = BeautifulSoup(html, "html.parser")
-    results = [] 
-    seen_urls = set()
+    results = []
+    seen = set()
 
     parsed = urlparse(base_url)
     origin = f"{parsed.scheme}://{parsed.netloc}"
 
     for a in soup.find_all("a", href=True):
-        raw_href = a["href"].strip()
-        if not raw_href:
+        raw = a["href"].strip()
+        if not raw or raw.startswith(("javascript:", "mailto:", "#")):
             continue
 
-        if raw_href.lower().startswith(("javascript:", "mailto:", "#")):
-            continue
-
-        if raw_href.startswith(("http://", "https://")):
-            href_abs = raw_href
+        if raw.startswith("http"):
+            href_abs = raw
         else:
-            href_abs = urljoin(origin, raw_href) 
+            href_abs = urljoin(origin, raw)
 
         text = a.get_text(" ", strip=True)
-        if not text:
-            continue
+        if keyword in text and href_abs not in seen:
+            period = extract_period(a)
+            results.append((href_abs, period))
+            seen.add(href_abs)
+            if len(results) >= max_links:
+                break
 
-        if keyword in text:
-            if href_abs not in seen_urls:
-                period = extract_period(a)
-                results.append((href_abs, period))
-                seen_urls.add(href_abs)
-                if len(results) >= max_links:
-                    break
-
-    return results 
+    return results
 
 # ---------------------------------------------------------
-# 이메일 본문 생성
+# 이메일 생성
 # ---------------------------------------------------------
 
 def build_email_body(matches: dict):
-    """matches 딕셔너리를 기반으로 이메일 본문을 생성한다."""
     lines = []
     lines.append("[Hibrain 임용 알리미] 지정 키워드 신규 감지 결과\n")
 
-    for kw, link_periods in matches.items():
-        period_info = link_periods[0][1] if link_periods else "(모집기간 정보 없음)"
-        
-        lines.append(f"■ 키워드: {kw} (모집기간: {period_info})")
-        
-        if link_periods:
-            for i, (u, _) in enumerate(link_periods, start=1):
-                lines.append(f"  - 관련 링크 {i}: {u}")
-        else:
-            lines.append("  - (키워드 주변 링크 없음)")
+    for kw, pairs in matches.items():
+        period = pairs[0][1] if pairs else "(모집기간 정보 없음)"
+        lines.append(f"■ 키워드: {kw} (모집기간: {period})")
+        for i, (url, _) in enumerate(pairs, start=1):
+            lines.append(f"  - 관련 링크 {i}: {url}")
         lines.append("")
 
     lines.append("-----")
@@ -230,10 +230,10 @@ def main():
     html_pages = []
 
     for u in CONFIG_URLS:
-        sleep_time = random.uniform(1.0, 3.0)
-        print(f"[{u}] 접근 전 {sleep_time:.2f}초 대기...")
-        time.sleep(sleep_time) 
-        
+        t = random.uniform(1.0, 3.0)
+        print(f"[{u}] 접근 전 {t:.2f}초 대기...")
+        time.sleep(t)
+
         html = fetch_page(u)
         if html:
             html_pages.append((u, html))
@@ -247,26 +247,24 @@ def main():
     matches = {}
 
     for kw in keywords:
-        keyword_matches = [] 
-        
-        for base_url, html in html_pages:
-            link_period_pairs = find_keyword_links_in_html(html, base_url, kw, max_links=MAX_LINKS)
-            if link_period_pairs:
-                keyword_matches.extend(link_period_pairs)
+        found = []
+        for base, html in html_pages:
+            pairs = find_keyword_links_in_html(html, base, kw, max_links=MAX_LINKS)
+            if pairs:
+                found.extend(pairs)
 
-        if keyword_matches:
-            unique_matches = []
-            seen_urls = set()
-            for url, period in keyword_matches:
-                if url not in seen_urls:
-                    unique_matches.append((url, period))
-                    seen_urls.add(url)
-                    if len(unique_matches) >= MAX_LINKS:
+        if found:
+            unique = []
+            seen = set()
+            for url, period in found:
+                if url not in seen:
+                    unique.append((url, period))
+                    seen.add(url)
+                    if len(unique) >= MAX_LINKS:
                         break
-            
-            if unique_matches:
-                matches[kw] = unique_matches
-                
+            if unique:
+                matches[kw] = unique
+
     if not matches:
         print("키워드 관련 링크 없음. 이메일 발송하지 않음.")
         return
