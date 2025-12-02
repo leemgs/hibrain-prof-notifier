@@ -120,15 +120,38 @@ def fetch_page(url: str, max_retries: int = 3) -> str | None:
 # ---------------------------------------------------------
 
 def extract_period(a_tag: Tag) -> str:
-    """<a> 태그가 속한 <li>에서 모집 기간을 추출."""
-    li_row = a_tag.find_parent("li", class_="row sortRoot")
+    """
+    주어진 <a> 태그를 포함하는 블록에서 모집 기간을 추출한다.
+    - 모바일 구조 예시:
+        <li class="banner ...">
+          ...
+          <div class="banner-information ...">
+            <a class="banner-text-link" ...>
+              <div class="date-text">25.12.01~내일마감</div>
+              ...
+    """
+    # 우선 a_tag가 속한 최상위 <li>를 찾는다.
+    li = a_tag.find_parent("li")
+    if not li:
+        return "(모집기간 정보 없음)"
+
+    # 1) 모바일(hibrain m 사이트) 구조: .date-text 안에 기간이 들어있음
+    date_div = li.find("div", class_="date-text")
+    if date_div:
+        text = date_div.get_text(strip=True)
+        if text:
+            # 예: "25.12.01~내일마감"
+            return text
+
+    # 2) 기존 PC 버전(또는 다른 구조) 대응: span.td_receipt 내부 숫자/특수기호 조합
+    li_row = li if ("row" in li.get("class", []) and "sortRoot" in li.get("class", [])) else li.find_parent("li", class_="row sortRoot")
     if not li_row:
         return "(모집기간 정보 없음)"
-    
+
     receipt_span = li_row.find("span", class_="td_receipt")
     if not receipt_span:
         return "(모집기간 정보 없음)"
-    
+
     period_parts = []
     for content in receipt_span.contents:
         if isinstance(content, Tag) and 'number' in content.get('class', []):
@@ -136,58 +159,72 @@ def extract_period(a_tag: Tag) -> str:
         elif isinstance(content, Tag) and 'specialCharacter' in content.get('class', []):
             period_parts.append('~')
         elif isinstance(content, str):
-            t = content.strip()
-            if t and t != '&nbsp;~&nbsp;':
-                period_parts.append(t)
+            text = content.strip()
+            if text and text != '&nbsp;~&nbsp;':
+                period_parts.append(text)
 
-    period_str = "".join(period_parts).replace("~~", "~").strip()
-    if period_str and "~" in period_str:
+    period_str = "".join(period_parts).replace('~~', '~').strip()
+
+    if period_str and '~' in period_str:
         return period_str
 
     return "(모집기간 정보 없음)"
 
 
 def find_keyword_links_in_html(html: str, base_url: str, keyword: str, max_links: int = 2):
+    """HTML 본문에서 키워드가 포함된 <a> 링크와 모집 기간을 찾는다."""
     soup = BeautifulSoup(html, "html.parser")
-    results = []
-    seen = set()
+    results = [] 
+    seen_urls = set()
 
     parsed = urlparse(base_url)
     origin = f"{parsed.scheme}://{parsed.netloc}"
 
     for a in soup.find_all("a", href=True):
-        raw = a["href"].strip()
-        if not raw or raw.startswith(("javascript:", "mailto:", "#")):
+        raw_href = a["href"].strip()
+        if not raw_href:
             continue
 
-        if raw.startswith("http"):
-            href_abs = raw
+        if raw_href.lower().startswith(("javascript:", "mailto:", "#")):
+            continue
+
+        if raw_href.startswith(("http://", "https://")):
+            href_abs = raw_href
         else:
-            href_abs = urljoin(origin, raw)
+            href_abs = urljoin(origin, raw_href) 
 
         text = a.get_text(" ", strip=True)
-        if keyword in text and href_abs not in seen:
-            period = extract_period(a)
-            results.append((href_abs, period))
-            seen.add(href_abs)
-            if len(results) >= max_links:
-                break
+        if not text:
+            continue
 
-    return results
+        if keyword in text:
+            if href_abs not in seen_urls:
+                period = extract_period(a)
+                results.append((href_abs, period))
+                seen_urls.add(href_abs)
+                if len(results) >= max_links:
+                    break
+
+    return results 
 
 # ---------------------------------------------------------
-# 이메일 생성
+# 이메일 본문 생성
 # ---------------------------------------------------------
 
 def build_email_body(matches: dict):
+    """matches 딕셔너리를 기반으로 이메일 본문을 생성한다."""
     lines = []
     lines.append("[Hibrain 임용 알리미] 지정 키워드 신규 감지 결과\n")
 
-    for kw, pairs in matches.items():
-        period = pairs[0][1] if pairs else "(모집기간 정보 없음)"
-        lines.append(f"■ 키워드: {kw} (모집기간: {period})")
-        for i, (url, _) in enumerate(pairs, start=1):
-            lines.append(f"  - 관련 링크 {i}: {url}")
+    for kw, link_periods in matches.items():
+        period_info = link_periods[0][1] if link_periods else "(모집기간 정보 없음)"
+        lines.append(f"■ 키워드: {kw} (모집기간: {period_info})")
+        
+        if link_periods:
+            for i, (u, _) in enumerate(link_periods, start=1):
+                lines.append(f"  - 관련 링크 {i}: {u}")
+        else:
+            lines.append("  - (키워드 주변 링크 없음)")
         lines.append("")
 
     lines.append("-----")
