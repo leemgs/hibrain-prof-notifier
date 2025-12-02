@@ -230,7 +230,7 @@ def main():
         keyword_matches = [] 
         
         for base_url, html in html_pages:
-            link_period_pairs = find_keyword_links_in_html(html, base_url, kw, max_links=MAX_LINKS)
+            link_period_pairs = find_keyword_links_in_html(html, base_url, kw, max_links=MAXLOPTS)
             if link_period_pairs:
                 keyword_matches.extend(link_period_pairs)
 
