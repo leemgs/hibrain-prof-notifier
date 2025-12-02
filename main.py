@@ -25,6 +25,15 @@ USER_AGENT = CONFIG.get("browser_user_agent")
 CONFIG_URLS = CONFIG.get("web_addresses", [])
 MAX_LINKS = CONFIG.get("max_links", 2)
 
+# 전역 세션 및 기본 헤더 설정 (403 완화용)
+SESSION = requests.Session()
+BASE_HEADERS = {
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    "Accept-Language": "ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7",
+    "Connection": "keep-alive",
+}
+SESSION.headers.update(BASE_HEADERS)
+
 # ---------------------------------------------------------
 # 키워드 로딩
 # ---------------------------------------------------------
@@ -43,40 +52,48 @@ def load_keywords(path: str = "keywords.txt"):
 # HTML 가져오기
 # ---------------------------------------------------------
 
-def fetch_page(url: str) -> str | None:
-    """주어진 URL에서 HTML을 가져온다."""
+def fetch_page(url: str, max_retries: int = 3) -> str | None:
+    """주어진 URL에서 HTML을 가져온다. (403/429 재시도 포함)"""
     if not url:
         return None
-
-    parsed = urlparse(url)
-    origin = f"{parsed.scheme}://{parsed.netloc}"
 
     # ⭐ User-Agent를 더욱 흔한 일반적인 PC 크롬 버전으로 강하게 재설정
     ua = USER_AGENT or (
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
         "AppleWebKit/537.36 (KHTML, like Gecko) "
-        "Chrome/100.0.4896.127 Safari/537.36"  # 차단이 덜 된 UA로 변경 시도
+        "Chrome/100.0.4896.127 Safari/537.36"
     )
+    SESSION.headers["User-Agent"] = ua
 
-    headers = {
-        "User-Agent": ua,
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        "Accept-Language": "ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7",
-        # Referer 헤더를 완전히 제거
-        # "Referer": origin + "/",  
-        "Connection": "keep-alive",
-    }
-
-    try:
-        resp = requests.get(url, headers=headers, timeout=15)
-        if resp.status_code != 200:
-            print(f"[WARN] 요청 실패: {url} (status={resp.status_code})")
+    for attempt in range(1, max_retries + 1):
+        try:
+            resp = SESSION.get(url, timeout=15)
+        except Exception as e:
+            print(f"[ERROR] 요청 중 예외 발생: {url} ({e}) (재시도 {attempt}/{max_retries})")
+            # 네트워크 예외 시 지수 백오프
+            if attempt < max_retries:
+                time.sleep(2 * attempt)
+                continue
             return None
-        resp.encoding = resp.apparent_encoding
-        return resp.text
-    except Exception as e:
-        print(f"[ERROR] 요청 중 예외 발생: {url} ({e})")
+
+        if resp.status_code == 200:
+            resp.encoding = resp.apparent_encoding
+            return resp.text
+
+        # 403/429는 잠시 뒤 재시도
+        if resp.status_code in (403, 429):
+            print(f"[WARN] 요청 실패: {url} (status={resp.status_code}), 재시도 {attempt}/{max_retries}")
+            if attempt < max_retries:
+                time.sleep(3 * attempt)
+                continue
+            return None
+
+        # 그 외 상태코드는 바로 실패
+        print(f"[WARN] 요청 실패: {url} (status={resp.status_code})")
         return None
+
+    print(f"[WARN] 재시도 후에도 HTML을 가져오지 못했습니다: {url}")
+    return None
 
 # ---------------------------------------------------------
 # HTML에서 키워드 링크와 모집기간 찾기
@@ -97,7 +114,7 @@ def extract_period(a_tag: Tag) -> str:
         if isinstance(content, Tag) and 'number' in content.get('class', []):
             period_parts.append(content.get_text(strip=True))
         elif isinstance(content, Tag) and 'specialCharacter' in content.get('class', []):
-             period_parts.append('~')
+            period_parts.append('~')
         elif isinstance(content, str):
             text = content.strip()
             if text and text != '&nbsp;~&nbsp;':
@@ -230,7 +247,7 @@ def main():
         keyword_matches = [] 
         
         for base_url, html in html_pages:
-            link_period_pairs = find_keyword_links_in_html(html, base_url, kw, max_links=MAXLOPTS)
+            link_period_pairs = find_keyword_links_in_html(html, base_url, kw, max_links=MAX_LINKS)
             if link_period_pairs:
                 keyword_matches.extend(link_period_pairs)
 
@@ -259,7 +276,7 @@ def main():
     print(body)
     print("=======================")
 
-    send_email(subject, body) # 실제 환경변수 설정 시 주석 해제
+    send_email(subject, body)  # 실제 환경변수 설정 시 주석 해제
 
 if __name__ == "__main__":
     main()
