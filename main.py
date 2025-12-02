@@ -4,7 +4,7 @@
 import os
 import json
 import smtplib
-from email.mime_text import MIMEText
+from email.mime.text import MIMEText
 from urllib.parse import urljoin, urlparse
 
 import requests
