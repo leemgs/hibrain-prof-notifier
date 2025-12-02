@@ -4,7 +4,7 @@
 import os
 import json
 import smtplib
-from email.mime.text import MIMEText
+from email.mime_text import MIMEText
 from urllib.parse import urljoin, urlparse
 
 import requests
@@ -75,6 +75,52 @@ def fetch_page(url: str) -> str | None:
         return None
 
 # ---------------------------------------------------------
+# HTML에서 모집기간 정보 추출 (URL -> 모집기간 매핑)
+# ---------------------------------------------------------
+
+def build_date_map(html: str, base_url: str):
+    """
+    배너 영역의 <div class="date-text"> 안에 있는 모집기간 문자열을
+    해당 공고 링크 URL에 매핑한다.
+    예: '/recruitment/recruits/3553329...' -> '25.11.27~25.12.12'
+    """
+    soup = BeautifulSoup(html, "html.parser")
+    date_map = {}
+
+    parsed = urlparse(base_url)
+    origin = f"{parsed.scheme}://{parsed.netloc}"
+
+    # 예제 구조:
+    # <div class="date-text"> 25.11.27~25.12.12 </div>
+    #   ↑ 상위에 <a href="...recruits/...">
+    for date_div in soup.find_all("div", class_="date-text"):
+        parent_a = date_div.find_parent("a", href=True)
+        if not parent_a:
+            continue
+
+        raw_href = parent_a["href"].strip()
+        if not raw_href:
+            continue
+
+        if raw_href.lower().startswith(("javascript:", "mailto:", "#")):
+            continue
+
+        if raw_href.startswith(("http://", "https://")):
+            href_abs = raw_href
+        else:
+            href_abs = urljoin(origin, raw_href)
+
+        date_text = date_div.get_text(" ", strip=True)
+        if not date_text:
+            continue
+
+        # 처음 발견된 값을 우선 사용
+        if href_abs not in date_map:
+            date_map[href_abs] = date_text
+
+    return date_map
+
+# ---------------------------------------------------------
 # HTML에서 키워드 링크 찾기
 # ---------------------------------------------------------
 
@@ -117,12 +163,29 @@ def find_keyword_links_in_html(html: str, base_url: str, keyword: str, max_links
 # 이메일 본문 생성
 # ---------------------------------------------------------
 
-def build_email_body(matches):
+def build_email_body(matches, date_map):
+    """
+    matches: {키워드: [url1, url2, ...]}
+    date_map: {url: '25.11.27~25.12.12'}
+    """
     lines = []
     lines.append("[Hibrain 임용 알리미] 지정 키워드 신규 감지 결과\n")
 
     for kw, urls in matches.items():
-        lines.append(f"■ 키워드: {kw}")
+        # 해당 키워드의 첫 번째 URL에서 모집기간 추출
+        period_str = None
+        for u in urls:
+            if u in date_map:
+                period_str = date_map[u]
+                break
+
+        if period_str:
+            # "25.11.27~25.12.12" -> "25.11.27 ~ 25.12.12"
+            normalized = period_str.replace("~", " ~ ").strip()
+            lines.append(f"■ 키워드: {kw} (모집기간: {normalized})")
+        else:
+            lines.append(f"■ 키워드: {kw}")
+
         if urls:
             for i, u in enumerate(urls, start=1):
                 lines.append(f"  - 관련 링크 {i}: {u}")
@@ -182,9 +245,16 @@ def main():
         return
 
     matches = {}
+    date_map = {}
 
-    for kw in keywords:
-        for base_url, html in html_pages:
+    # HTML별로: 1) URL->모집기간 맵 구축  2) 키워드별 링크 수집
+    for base_url, html in html_pages:
+        # 모집기간 맵 업데이트
+        local_date_map = build_date_map(html, base_url)
+        date_map.update(local_date_map)
+
+        # 키워드별 링크 찾기
+        for kw in keywords:
             urls = find_keyword_links_in_html(html, base_url, kw, max_links=MAX_LINKS)
             if urls:
                 matches.setdefault(kw, []).extend(urls)
@@ -197,7 +267,7 @@ def main():
         print("키워드 관련 링크 없음. 이메일 발송하지 않음.")
         return
 
-    body = build_email_body(matches)
+    body = build_email_body(matches, date_map)
     subject = f"[Hibrain] 임용 공지 알리미 (최대 {MAX_LINKS}개 링크)"
 
     print("=== 이메일 미리보기 ===")
