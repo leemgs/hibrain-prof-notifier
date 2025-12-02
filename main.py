@@ -8,7 +8,7 @@ from email.mime.text import MIMEText
 from urllib.parse import urljoin, urlparse
 
 import requests
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, Tag
 
 # ---------------------------------------------------------
 # 설정 로딩
@@ -49,18 +49,18 @@ def fetch_page(url: str) -> str | None:
     parsed = urlparse(url)
     origin = f"{parsed.scheme}://{parsed.netloc}"
 
-    # ⭐ User-Agent를 최신 일반 브라우저로 변경
+    # ⭐ User-Agent는 config.json을 따르되, 기본값은 PC 버전으로 설정
     ua = USER_AGENT or (
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
         "AppleWebKit/537.36 (KHTML, like Gecko) "
-        "Chrome/129.0.6647.44 Safari/537.36" 
+        "Chrome/129.0.6647.44 Safari/537.36"  
     )
 
     headers = {
         "User-Agent": ua,
         "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
         "Accept-Language": "ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7",
-        # ⭐ Referer를 간단히 루트로 설정하여 회피 시도
+        # Referer를 제거하거나 간단히 설정하여 차단 회피 시도
         "Referer": origin + "/", 
         "Connection": "keep-alive",
     }
@@ -77,14 +77,50 @@ def fetch_page(url: str) -> str | None:
         return None
 
 # ---------------------------------------------------------
-# HTML에서 키워드 링크 찾기
+# HTML에서 키워드 링크와 모집기간 찾기 (수정됨)
 # ---------------------------------------------------------
 
+def extract_period(a_tag: Tag) -> str:
+    """주어진 <a> 태그를 포함하는 <li> 태그에서 모집 기간을 추출한다."""
+    # <a> 태그에서 상위 <li>.row.sortRoot 태그를 찾는다
+    li_row = a_tag.find_parent("li", class_="row sortRoot")
+    if not li_row:
+        return "(모집기간 정보 없음)"
+    
+    # 모집기간 정보가 있는 <span>.td_receipt 태그를 찾는다
+    receipt_span = li_row.find("span", class_="td_receipt")
+    if not receipt_span:
+        return "(모집기간 정보 없음)"
+    
+    # <span>.td_receipt 내부의 텍스트(공백 제거 후)를 조합하여 기간을 추출
+    # 예: <span class="number">25.11.27</span><span class="specialCharacter">&nbsp;~&nbsp;</span><span class=" number">25.12.12</span>
+    period_parts = []
+    for content in receipt_span.contents:
+        if isinstance(content, Tag) and 'number' in content.get('class', []):
+            period_parts.append(content.get_text(strip=True))
+        elif isinstance(content, Tag) and 'specialCharacter' in content.get('class', []):
+             period_parts.append('~')
+        elif isinstance(content, str):
+            text = content.strip()
+            if text and text != '&nbsp;~&nbsp;': # 혹시 모를 HTML 엔티티를 명시적으로 제거
+                period_parts.append(text)
+
+    # 텍스트를 정리하고 '시작일 ~ 종료일' 형식으로 만듭니다.
+    # 중복된 '~'를 제거하고 공백을 없앤 후 다시 '~'로 연결합니다.
+    period_str = "".join(period_parts).replace('~~', '~').strip()
+    
+    if period_str and '~' in period_str:
+        return period_str
+    
+    return "(모집기간 정보 없음)"
+
+
 def find_keyword_links_in_html(html: str, base_url: str, keyword: str, max_links: int = 2):
-    """HTML 본문에서 키워드가 포함된 <a> 링크를 찾는다."""
+    """HTML 본문에서 키워드가 포함된 <a> 링크와 모집 기간을 찾는다."""
     soup = BeautifulSoup(html, "html.parser")
-    results = []
-    seen = set()
+    # 결과는 (절대 URL, 모집기간) 튜플 리스트로 저장
+    results = [] 
+    seen_urls = set()
 
     parsed = urlparse(base_url)
     origin = f"{parsed.scheme}://{parsed.netloc}"
@@ -100,33 +136,43 @@ def find_keyword_links_in_html(html: str, base_url: str, keyword: str, max_links
         if raw_href.startswith(("http://", "https://")):
             href_abs = raw_href
         else:
-            href_abs = urljoin(origin, raw_href)
+            # urljoin 함수를 사용하면 HTML 엔티티가 포함된 URL도 처리 가능
+            href_abs = urljoin(origin, raw_href) 
 
         text = a.get_text(" ", strip=True)
         if not text:
             continue
 
         if keyword in text:
-            if href_abs not in seen:
-                results.append(href_abs)
-                seen.add(href_abs)
+            if href_abs not in seen_urls:
+                # ⭐️ 모집기간 추출
+                period = extract_period(a)
+                results.append((href_abs, period))
+                seen_urls.add(href_abs)
                 if len(results) >= max_links:
                     break
 
-    return results
+    return results # [ (URL, 기간), (URL, 기간), ... ] 형식
 
 # ---------------------------------------------------------
-# 이메일 본문 생성
+# 이메일 본문 생성 (수정됨)
 # ---------------------------------------------------------
 
-def build_email_body(matches):
+def build_email_body(matches: dict):
+    """matches 딕셔너리를 기반으로 이메일 본문을 생성한다."""
     lines = []
     lines.append("[Hibrain 임용 알리미] 지정 키워드 신규 감지 결과\n")
 
-    for kw, urls in matches.items():
-        lines.append(f"■ 키워드: {kw}")
-        if urls:
-            for i, u in enumerate(urls, start=1):
+    # matches 딕셔너리는 { '키워드': [ (URL, 기간), (URL, 기간) ] } 형식을 기대
+    for kw, link_periods in matches.items():
+        # 첫 번째 링크의 기간 정보를 키워드 라인에 사용 (하나의 키워드에 대해 기간은 동일할 것으로 가정)
+        period_info = link_periods[0][1] if link_periods else "(모집기간 정보 없음)"
+        
+        # ⭐️ 키워드 라인에 모집 기간 추가
+        lines.append(f"■ 키워드: {kw} (모집기간: {period_info})")
+        
+        if link_periods:
+            for i, (u, _) in enumerate(link_periods, start=1):
                 lines.append(f"  - 관련 링크 {i}: {u}")
         else:
             lines.append("  - (키워드 주변 링크 없음)")
@@ -144,6 +190,7 @@ def build_email_body(matches):
 # ---------------------------------------------------------
 
 def send_email(subject: str, body: str):
+    # 기존 코드와 동일
     gmail_user = os.environ.get("GMAIL_USER")
     gmail_app_password = os.environ.get("GMAIL_APP_PASSWORD")
     target_email = os.environ.get("TARGET_EMAIL")
@@ -163,7 +210,7 @@ def send_email(subject: str, body: str):
     print("이메일 발송 완료")
 
 # ---------------------------------------------------------
-# 메인 로직
+# 메인 로직 (수정됨)
 # ---------------------------------------------------------
 
 def main():
@@ -183,22 +230,38 @@ def main():
         print("[WARN] 어떤 URL에서도 HTML을 가져오지 못했습니다. 이메일 발송 없음.")
         return
 
+    # matches 딕셔너리 구조 변경: { 키워드: [ (URL, 기간), (URL, 기간), ... ] }
     matches = {}
 
     for kw in keywords:
+        # 이 키워드에 대해 감지된 링크와 기간 쌍을 임시로 저장
+        keyword_matches = [] 
+        
         for base_url, html in html_pages:
-            urls = find_keyword_links_in_html(html, base_url, kw, max_links=MAX_LINKS)
-            if urls:
-                matches.setdefault(kw, []).extend(urls)
+            # find_keyword_links_in_html은 [ (URL, 기간), ... ] 리스트를 반환
+            link_period_pairs = find_keyword_links_in_html(html, base_url, kw, max_links=MAX_LINKS)
+            if link_period_pairs:
+                keyword_matches.extend(link_period_pairs)
 
-    # 중복 제거
-    for k in matches:
-        matches[k] = list(dict.fromkeys(matches[k]))[:MAX_LINKS]
-
+        if keyword_matches:
+            # 중복 제거 (URL 기준) 및 MAX_LINKS 개수 제한
+            unique_matches = []
+            seen_urls = set()
+            for url, period in keyword_matches:
+                if url not in seen_urls:
+                    unique_matches.append((url, period))
+                    seen_urls.add(url)
+                    if len(unique_matches) >= MAX_LINKS:
+                        break
+            
+            if unique_matches:
+                matches[kw] = unique_matches
+                
     if not matches:
         print("키워드 관련 링크 없음. 이메일 발송하지 않음.")
         return
 
+    # build_email_body 함수는 변경된 matches 구조를 처리합니다.
     body = build_email_body(matches)
     subject = f"[Hibrain] 임용 공지 알리미 (최대 {MAX_LINKS}개 링크)"
 
@@ -207,7 +270,7 @@ def main():
     print(body)
     print("=======================")
 
-    send_email(subject, body)
+    # send_email(subject, body) # 실제 환경변수 설정 시 주석 해제
 
 if __name__ == "__main__":
     main()
