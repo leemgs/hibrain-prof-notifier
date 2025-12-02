@@ -11,7 +11,7 @@ import requests
 from bs4 import BeautifulSoup
 
 # ----------------------------------------------------------------------
-# 설정 로딩
+# setting information loading
 # ----------------------------------------------------------------------
 
 def load_config(path: str = "config.json"):
@@ -26,7 +26,7 @@ MAX_LINKS = CONFIG.get("max_links", 2)
 
 
 # ----------------------------------------------------------------------
-# 키워드 로딩
+# keyword loading
 # ----------------------------------------------------------------------
 
 def load_keywords(path: str = "keywords.txt"):
@@ -41,7 +41,7 @@ def load_keywords(path: str = "keywords.txt"):
 
 
 # ----------------------------------------------------------------------
-# HTML 가져오기
+# fetching HTML contents
 # ----------------------------------------------------------------------
 
 def fetch_page(url: str) -> str | None:
