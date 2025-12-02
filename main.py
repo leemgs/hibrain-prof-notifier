@@ -130,6 +130,11 @@ def build_email_body(matches):
             lines.append("  - (키워드 주변 링크 없음)")
         lines.append("")
 
+    # Footer 추가
+    lines.append("-----")
+    lines.append("GitHub Repo Address:")
+    lines.append("https://github.com/leemgs/hibrain-prof-notifier/")
+
     return "\n".join(lines)
 
 # ---------------------------------------------------------
