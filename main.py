@@ -57,7 +57,14 @@ def fetch_page(url: str, max_retries: int = 3) -> str | None:
     if not url:
         return None
 
-    # ⭐ User-Agent를 더욱 흔한 일반적인 PC 크롬 버전으로 강하게 재설정
+    # hibrain은 모바일(m)에서 차단이 훨씬 덜함 — 자동 변환
+    parsed = urlparse(url)
+    if parsed.netloc == "www.hibrain.net":
+        mobile_url = url.replace("://www.", "://m.")
+        print(f"[INFO] www.hibrain.net 대신 모바일 도메인으로 시도: {mobile_url}")
+        url = mobile_url
+
+    # User-Agent 설정
     ua = USER_AGENT or (
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
         "AppleWebKit/537.36 (KHTML, like Gecko) "
@@ -65,12 +72,12 @@ def fetch_page(url: str, max_retries: int = 3) -> str | None:
     )
     SESSION.headers["User-Agent"] = ua
 
+    # 재시도 로직
     for attempt in range(1, max_retries + 1):
         try:
             resp = SESSION.get(url, timeout=15)
         except Exception as e:
             print(f"[ERROR] 요청 중 예외 발생: {url} ({e}) (재시도 {attempt}/{max_retries})")
-            # 네트워크 예외 시 지수 백오프
             if attempt < max_retries:
                 time.sleep(2 * attempt)
                 continue
@@ -80,7 +87,6 @@ def fetch_page(url: str, max_retries: int = 3) -> str | None:
             resp.encoding = resp.apparent_encoding
             return resp.text
 
-        # 403/429는 잠시 뒤 재시도
         if resp.status_code in (403, 429):
             print(f"[WARN] 요청 실패: {url} (status={resp.status_code}), 재시도 {attempt}/{max_retries}")
             if attempt < max_retries:
@@ -88,7 +94,6 @@ def fetch_page(url: str, max_retries: int = 3) -> str | None:
                 continue
             return None
 
-        # 그 외 상태코드는 바로 실패
         print(f"[WARN] 요청 실패: {url} (status={resp.status_code})")
         return None
 
@@ -185,7 +190,6 @@ def build_email_body(matches: dict):
             lines.append("  - (키워드 주변 링크 없음)")
         lines.append("")
 
-    # Footer 추가
     lines.append("-----")
     lines.append("GitHub Repo Address:")
     lines.append("https://github.com/leemgs/hibrain-prof-notifier/")
@@ -226,7 +230,6 @@ def main():
     html_pages = []
 
     for u in CONFIG_URLS:
-        # ⭐ 임의 지연 시간 추가 (차단 회피 시도)
         sleep_time = random.uniform(1.0, 3.0)
         print(f"[{u}] 접근 전 {sleep_time:.2f}초 대기...")
         time.sleep(sleep_time) 
@@ -276,7 +279,7 @@ def main():
     print(body)
     print("=======================")
 
-    send_email(subject, body)  # 실제 환경변수 설정 시 주석 해제
+    send_email(subject, body)
 
 if __name__ == "__main__":
     main()
