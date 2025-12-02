@@ -259,7 +259,7 @@ def main():
     print(body)
     print("=======================")
 
-    # send_email(subject, body) # 실제 환경변수 설정 시 주석 해제
+    send_email(subject, body) # 실제 환경변수 설정 시 주석 해제
 
 if __name__ == "__main__":
     main()
