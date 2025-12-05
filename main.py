@@ -10,7 +10,7 @@ from urllib.parse import urljoin, urlparse
 import requests
 from bs4 import BeautifulSoup, Tag
 import random
-import time 
+import time
 
 # ---------------------------------------------------------
 # 설정 로딩
@@ -220,7 +220,7 @@ def extract_period(a_tag: Tag) -> str:
 def find_keyword_links_in_html(html: str, base_url: str, keyword: str, max_links: int = 2):
     """HTML 본문에서 키워드가 포함된 <a> 링크와 모집 기간을 찾는다."""
     soup = BeautifulSoup(html, "html.parser")
-    results = [] 
+    results = []
     seen_urls = set()
 
     parsed = urlparse(base_url)
@@ -237,7 +237,7 @@ def find_keyword_links_in_html(html: str, base_url: str, keyword: str, max_links
         if raw_href.startswith(("http://", "https://")):
             href_abs = raw_href
         else:
-            href_abs = urljoin(origin, raw_href) 
+            href_abs = urljoin(origin, raw_href)
 
         text = a.get_text(" ", strip=True)
         if not text:
@@ -251,7 +251,7 @@ def find_keyword_links_in_html(html: str, base_url: str, keyword: str, max_links
                 if len(results) >= max_links:
                     break
 
-    return results 
+    return results
 
 # ---------------------------------------------------------
 # 이메일 본문 생성
@@ -265,7 +265,7 @@ def build_email_body(matches: dict):
     for kw, link_periods in matches.items():
         period_info = link_periods[0][1] if link_periods else "(모집기간 정보 없음)"
         lines.append(f"■ 키워드: {kw} (모집기간: {period_info})")
-        
+
         if link_periods:
             for i, (u, _) in enumerate(link_periods, start=1):
                 lines.append(f"  - 관련 링크 {i}: {u}")
@@ -303,6 +303,45 @@ def send_email(subject: str, body: str):
     print("이메일 발송 완료")
 
 # ---------------------------------------------------------
+# GitHub Issue 자동 생성 (추가된 부분)
+# ---------------------------------------------------------
+
+def create_github_issue(title: str, body: str):
+    """
+    크롤링 결과를 GitHub Issue로도 남긴다.
+    - GITHUB_REPOSITORY: 'owner/repo' 형식 (GitHub Actions에서 기본 제공)
+    - GITHUB_TOKEN: GitHub API 인증 토큰 (GitHub Actions의 GITHUB_TOKEN 사용 권장)
+    """
+    repo = os.environ.get("GITHUB_REPOSITORY")
+    token = os.environ.get("GITHUB_TOKEN")
+
+    if not repo or not token:
+        print("[WARN] GITHUB_REPOSITORY 또는 GITHUB_TOKEN 이 설정되어 있지 않아 Issue를 생성하지 않습니다.")
+        return
+
+    api_url = f"https://api.github.com/repos/{repo}/issues"
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Accept": "application/vnd.github+json",
+    }
+    payload = {
+        "title": title,
+        "body": body,
+    }
+
+    try:
+        resp = requests.post(api_url, headers=headers, json=payload, timeout=10)
+    except Exception as e:
+        print(f"[ERROR] GitHub Issue 생성 중 예외 발생: {e}")
+        return
+
+    if resp.status_code == 201:
+        issue_url = resp.json().get("html_url")
+        print(f"[INFO] GitHub Issue 생성 완료: {issue_url}")
+    else:
+        print(f"[WARN] GitHub Issue 생성 실패: status={resp.status_code}, body={resp.text}")
+
+# ---------------------------------------------------------
 # 메인 로직
 # ---------------------------------------------------------
 
@@ -324,7 +363,7 @@ def main():
             print(f"[WARN] HTML을 가져오지 못함: {u}")
 
     if not html_pages:
-        print("[WARN] 어떤 URL에서도 HTML을 가져오지 못했습니다. 이메일 발송 없음.")
+        print("[WARN] 어떤 URL에서도 HTML을 가져오지 못했습니다. 이메일/Issue 발송 없음.")
         return
 
     matches = {}
@@ -349,18 +388,22 @@ def main():
                 matches[kw] = unique
 
     if not matches:
-        print("키워드 관련 링크 없음. 이메일 발송하지 않음.")
+        print("키워드 관련 링크 없음. 이메일/Issue 발송하지 않음.")
         return
 
     body = build_email_body(matches)
     subject = f"[Hibrain] 임용 공지 알리미 (최대 {MAX_LINKS}개 링크)"
 
-    print("=== 이메일 미리보기 ===")
+    print("=== 이메일/Issue 미리보기 ===")
     print("Subject:", subject)
     print(body)
     print("=======================")
 
+    # 이메일 발송
     send_email(subject, body)
+
+    # GitHub Issue 생성
+    create_github_issue(subject, body)
 
 if __name__ == "__main__":
     main()
