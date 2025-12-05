@@ -35,6 +35,33 @@ BASE_HEADERS = {
 SESSION.headers.update(BASE_HEADERS)
 
 # ---------------------------------------------------------
+# 로그 버퍼 & 헬퍼
+# ---------------------------------------------------------
+
+LOG_MESSAGES: list[str] = []
+LAST_FORBIDDEN_INFO: dict | None = None  # 마지막 403 정보 저장용
+
+def log(msg: str):
+    """콘솔에 출력 + LOG_MESSAGES에 저장"""
+    print(msg)
+    LOG_MESSAGES.append(msg)
+
+# ---------------------------------------------------------
+# 공인 IP 조회
+# ---------------------------------------------------------
+
+def get_public_ip() -> str:
+    """GitHub Actions 러너의 공인 IP 조회 (실패 시 '(조회 실패)' 반환)"""
+    try:
+        resp = requests.get("https://api.ipify.org", timeout=5)
+        if resp.status_code == 200:
+            return resp.text.strip()
+        return f"(조회 실패: status={resp.status_code})"
+    except Exception as e:
+        log(f"[WARN] 공인 IP 조회 실패: {e}")
+        return "(조회 실패)"
+
+# ---------------------------------------------------------
 # 워밍업 요청 (추가된 부분)
 # ---------------------------------------------------------
 
@@ -50,11 +77,11 @@ def warmup_session(url: str) -> None:
     try:
         parsed = urlparse(url)
         origin = f"{parsed.scheme}://{parsed.netloc}"
-        print(f"[INFO] 워밍업 요청: {origin}")
+        log(f"[INFO] 워밍업 요청: {origin}")
         resp = SESSION.get(origin, timeout=10)
-        print(f"[INFO] 워밍업 응답 코드: {resp.status_code}")
+        log(f"[INFO] 워밍업 응답 코드: {resp.status_code}")
     except Exception as e:
-        print(f"[WARN] 워밍업 요청 실패: {e}")
+        log(f"[WARN] 워밍업 요청 실패: {e}")
     finally:
         # 성공/실패와 관계없이 추가 워밍업은 하지 않도록 플래그 설정
         SESSION._warmed_up = True
@@ -79,6 +106,8 @@ def load_keywords(path: str = "keywords.txt"):
 
 def fetch_page(url: str, max_retries: int = 3) -> str | None:
     """주어진 URL에서 HTML을 가져온다. (403/429/503 재시도 + 워밍업 + 지수형 딜레이)"""
+    global LAST_FORBIDDEN_INFO
+
     if not url:
         return None
 
@@ -86,7 +115,7 @@ def fetch_page(url: str, max_retries: int = 3) -> str | None:
     parsed_for_domain = urlparse(url)
     if parsed_for_domain.netloc == "www.hibrain.net":
         mobile_url = url.replace("://www.", "://m.")
-        print(f"[INFO] www.hibrain.net 대신 모바일 도메인으로 시도: {mobile_url}")
+        log(f"[INFO] www.hibrain.net 대신 모바일 도메인으로 시도: {mobile_url}")
         url = mobile_url
 
     # User-Agent 설정
@@ -121,19 +150,19 @@ def fetch_page(url: str, max_retries: int = 3) -> str | None:
     for attempt in range(1, max_retries + 1):
         # 시도할 때마다 딜레이를 조금씩 늘리는 지수형 + 랜덤 딜레이
         delay = random.uniform(1.0, 3.0) * attempt
-        print(f"[INFO] {url} 요청 전 {delay:.2f}초 대기... (시도 {attempt}/{max_retries})")
+        log(f"[INFO] {url} 요청 전 {delay:.2f}초 대기... (시도 {attempt}/{max_retries})")
         time.sleep(delay)
 
         try:
             resp = SESSION.get(url, timeout=15)
             last_status = resp.status_code
         except Exception as e:
-            print(
+            log(
                 f"[ERROR] 요청 중 예외 발생: {url} ({e}) "
                 f"(재시도 {attempt}/{max_retries})"
             )
             if attempt < max_retries:
-                # 네트워크 예외 시에도 지수형 딜레이 후 재시도
+                # 네트워크 예외 시에도 재시도
                 continue
             return None
 
@@ -144,21 +173,25 @@ def fetch_page(url: str, max_retries: int = 3) -> str | None:
 
         # 403/429/503 → 접근 제한/과도한 요청/서비스 불가 → 재시도 후보
         if resp.status_code in (403, 429, 503):
-            print(
+            log(
                 f"[WARN] 요청 실패: {url} (status={resp.status_code}), "
                 f"재시도 {attempt}/{max_retries}"
             )
+            # 마지막 시도 + 403이면 IP 차단 상황으로 기록
+            if resp.status_code == 403 and attempt == max_retries:
+                LAST_FORBIDDEN_INFO = {
+                    "url": url,
+                    "status": resp.status_code,
+                }
             if attempt < max_retries:
-                # 다음 루프로 넘어가며 딜레이 포함 재시도
                 continue
-            # 마지막 시도까지 실패하면 포기
             return None
 
         # 그 외 상태코드: 재시도해도 의미 없다고 보고 바로 종료
-        print(f"[WARN] 요청 실패: {url} (status={resp.status_code})")
+        log(f"[WARN] 요청 실패: {url} (status={resp.status_code})")
         return None
 
-    print(f"[WARN] 재시도 후에도 HTML을 가져오지 못했습니다: {url} (마지막 status={last_status})")
+    log(f"[WARN] 재시도 후에도 HTML을 가져오지 못했습니다: {url} (마지막 status={last_status})")
     return None
 
 # ---------------------------------------------------------
@@ -300,7 +333,7 @@ def send_email(subject: str, body: str):
         smtp.login(gmail_user, gmail_app_password)
         smtp.send_message(msg)
 
-    print("이메일 발송 완료")
+    log("이메일 발송 완료")
 
 # ---------------------------------------------------------
 # GitHub Issue 자동 생성 (추가된 부분)
@@ -316,7 +349,7 @@ def create_github_issue(title: str, body: str):
     token = os.environ.get("GITHUB_TOKEN")
 
     if not repo or not token:
-        print("[WARN] GITHUB_REPOSITORY 또는 GITHUB_TOKEN 이 설정되어 있지 않아 Issue를 생성하지 않습니다.")
+        log("[WARN] GITHUB_REPOSITORY 또는 GITHUB_TOKEN 이 설정되어 있지 않아 Issue를 생성하지 않습니다.")
         return
 
     api_url = f"https://api.github.com/repos/{repo}/issues"
@@ -332,14 +365,14 @@ def create_github_issue(title: str, body: str):
     try:
         resp = requests.post(api_url, headers=headers, json=payload, timeout=10)
     except Exception as e:
-        print(f"[ERROR] GitHub Issue 생성 중 예외 발생: {e}")
+        log(f"[ERROR] GitHub Issue 생성 중 예외 발생: {e}")
         return
 
     if resp.status_code == 201:
         issue_url = resp.json().get("html_url")
-        print(f"[INFO] GitHub Issue 생성 완료: {issue_url}")
+        log(f"[INFO] GitHub Issue 생성 완료: {issue_url}")
     else:
-        print(f"[WARN] GitHub Issue 생성 실패: status={resp.status_code}, body={resp.text}")
+        log(f"[WARN] GitHub Issue 생성 실패: status={resp.status_code}, body={resp.text}")
 
 # ---------------------------------------------------------
 # 메인 로직
@@ -347,23 +380,40 @@ def create_github_issue(title: str, body: str):
 
 def main():
     keywords = load_keywords()
-    print(f"로드된 키워드: {keywords}")
+    log(f"로드된 키워드: {keywords}")
 
     html_pages = []
 
     for u in CONFIG_URLS:
         t = random.uniform(1.0, 3.0)
-        print(f"[{u}] 접근 전 {t:.2f}초 대기...")
+        log(f"[{u}] 접근 전 {t:.2f}초 대기...")
         time.sleep(t)
 
         html = fetch_page(u)
         if html:
             html_pages.append((u, html))
         else:
-            print(f"[WARN] HTML을 가져오지 못함: {u}")
+            log(f"[WARN] HTML을 가져오지 못함: {u}")
 
+    # ✅ 모든 URL에서 HTML을 못 가져왔고, 마지막 상태가 403인 경우 → IP 차단 에러 메일/Issue
     if not html_pages:
-        print("[WARN] 어떤 URL에서도 HTML을 가져오지 못했습니다. 이메일/Issue 발송 없음.")
+        if LAST_FORBIDDEN_INFO and LAST_FORBIDDEN_INFO.get("status") == 403:
+            ip = get_public_ip()
+            logs = "\n".join(LOG_MESSAGES) if LOG_MESSAGES else "(로그 없음)"
+
+            subject = "[Hibrain] 임용 공지 알리미 (서버측 IP차단으로 정보수집 실패)"
+            body = (
+                "Hibrain 서버측의 특정 IP 차단(403 에러)으로 인한 정보 수집 불가\n"
+                f"- 깃허브 액션 IP주소: {ip}\n"
+                "- 로그 메세지:\n"
+                f"{logs}\n"
+            )
+
+            log("=== IP 차단 에러 발생: 이메일/Issue 전송 ===")
+            send_email(subject, body)
+            create_github_issue(subject, body)
+        else:
+            log("[WARN] 어떤 URL에서도 HTML을 가져오지 못했습니다. 이메일/Issue 발송 없음.")
         return
 
     matches = {}
@@ -388,16 +438,16 @@ def main():
                 matches[kw] = unique
 
     if not matches:
-        print("키워드 관련 링크 없음. 이메일/Issue 발송하지 않음.")
+        log("키워드 관련 링크 없음. 이메일/Issue 발송하지 않음.")
         return
 
     body = build_email_body(matches)
     subject = f"[Hibrain] 임용 공지 알리미 (최대 {MAX_LINKS}개 링크)"
 
-    print("=== 이메일/Issue 미리보기 ===")
-    print("Subject:", subject)
-    print(body)
-    print("=======================")
+    log("=== 이메일/Issue 미리보기 ===")
+    log(f"Subject: {subject}")
+    log(body)
+    log("=======================")
 
     # 이메일 발송
     send_email(subject, body)
