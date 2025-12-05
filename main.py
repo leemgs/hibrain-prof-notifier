@@ -1,42 +1,31 @@
-#!/usr/bin/env bash
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 
-import json
 import os
-import time
-import random
-import requests
+import json
 import smtplib
-from urllib.parse import urlparse
-from email.mime.text import MIMEText
-from email.utils import formataddr
-from bs4 import BeautifulSoup
+from email.mime_text import MIMEText
+from urllib.parse import urljoin, urlparse
 
+import requests
+from bs4 import BeautifulSoup, Tag
+import random
+import time 
 
-CONFIG_FILE = "config.json"
+# ---------------------------------------------------------
+# 설정 로딩
+# ---------------------------------------------------------
 
-
-# =========================================================
-# LOAD CONFIG.JSON
-# =========================================================
-def load_config():
-    try:
-        with open(CONFIG_FILE, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except Exception as e:
-        print("[WARN] 설정 파일을 읽는 중 오류 발생:", e)
-        return {}
-
+def load_config(path: str = "config.json"):
+    with open(path, encoding="utf-8") as f:
+        return json.load(f)
 
 CONFIG = load_config()
 USER_AGENT = CONFIG.get("browser_user_agent")
 CONFIG_URLS = CONFIG.get("web_addresses", [])
 MAX_LINKS = CONFIG.get("max_links", 2)
-KEYWORDS = CONFIG.get("keywords", [])
 
-
-# =========================================================
-# GLOBAL SESSION 설정
-# =========================================================
+# 전역 세션 및 기본 헤더 설정 (403 완화용)
 SESSION = requests.Session()
 BASE_HEADERS = {
     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
@@ -45,46 +34,72 @@ BASE_HEADERS = {
 }
 SESSION.headers.update(BASE_HEADERS)
 
+# ---------------------------------------------------------
+# 워밍업 요청 (추가된 부분)
+# ---------------------------------------------------------
 
-# =========================================================
-# 워밍업 요청 (최소 변경)
-# =========================================================
-def warmup_session(url):
-    """같은 도메인의 루트 페이지를 한 번 찍어서 쿠키/세션 확보를 시도한다."""
+def warmup_session(url: str) -> None:
+    """
+    같은 도메인의 루트 페이지를 한 번 찍어서
+    쿠키/세션 확보를 시도한다.
+    한 실행(run) 안에서는 한 번만 수행한다.
+    """
     if getattr(SESSION, "_warmed_up", False):
         return
+
     try:
         parsed = urlparse(url)
         origin = f"{parsed.scheme}://{parsed.netloc}"
         print(f"[INFO] 워밍업 요청: {origin}")
         resp = SESSION.get(origin, timeout=10)
-        print(f"[INFO] 워밍업 응답코드: {resp.status_code}")
+        print(f"[INFO] 워밍업 응답 코드: {resp.status_code}")
     except Exception as e:
-        print("[WARN] 워밍업 실패:", e)
+        print(f"[WARN] 워밍업 요청 실패: {e}")
     finally:
+        # 성공/실패와 관계없이 추가 워밍업은 하지 않도록 플래그 설정
         SESSION._warmed_up = True
 
+# ---------------------------------------------------------
+# 키워드 로딩
+# ---------------------------------------------------------
 
-# =========================================================
-# 페이지 요청 함수 (기존 형태 유지 + 403 개선)
-# =========================================================
-def fetch_page(url, max_retries=3):
+def load_keywords(path: str = "keywords.txt"):
+    """keywords.txt에서 키워드 목록을 읽는다."""
+    keywords = []
+    with open(path, "r", encoding="utf-8") as f:
+        for line in f:
+            kw = line.strip()
+            if kw:
+                keywords.append(kw)
+    return keywords
+
+# ---------------------------------------------------------
+# HTML 가져오기 (403 완화 핵심)
+# ---------------------------------------------------------
+
+def fetch_page(url: str, max_retries: int = 3) -> str | None:
+    """주어진 URL에서 HTML을 가져온다. (403/429/503 재시도 + 워밍업 + 지수형 딜레이)"""
     if not url:
         return None
 
-    parsed = urlparse(url)
-    if parsed.netloc == "www.hibrain.net":
-        url = url.replace("://www.", "://m.")
-        parsed = urlparse(url)
+    # 모바일 도메인으로 자동 전환
+    parsed_for_domain = urlparse(url)
+    if parsed_for_domain.netloc == "www.hibrain.net":
+        mobile_url = url.replace("://www.", "://m.")
+        print(f"[INFO] www.hibrain.net 대신 모바일 도메인으로 시도: {mobile_url}")
+        url = mobile_url
 
+    # User-Agent 설정
     ua = USER_AGENT or (
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
         "AppleWebKit/537.36 (KHTML, like Gecko) "
-        "Chrome/120.0.0.0 Safari/537.36"
+        "Chrome/100.0.4896.127 Safari/537.36"
     )
 
+    parsed = urlparse(url)
     origin = f"{parsed.scheme}://{parsed.netloc}"
 
+    # 브라우저와 최대한 비슷한 헤더 세팅
     SESSION.headers.update({
         "User-Agent": ua,
         "Referer": origin + "/recruitment",
@@ -97,12 +112,14 @@ def fetch_page(url, max_retries=3):
         "Accept-Encoding": "gzip, deflate, br",
     })
 
-    # 워밍업 수행
+    # ★ 추가: 도메인 루트 워밍업 (실행당 1회)
     warmup_session(url)
 
-    last_status = None
+    last_status: int | None = None
 
+    # 재시도
     for attempt in range(1, max_retries + 1):
+        # 시도할 때마다 딜레이를 조금씩 늘리는 지수형 + 랜덤 딜레이
         delay = random.uniform(1.0, 3.0) * attempt
         print(f"[INFO] {url} 요청 전 {delay:.2f}초 대기... (시도 {attempt}/{max_retries})")
         time.sleep(delay)
@@ -110,165 +127,240 @@ def fetch_page(url, max_retries=3):
         try:
             resp = SESSION.get(url, timeout=15)
             last_status = resp.status_code
-        except requests.RequestException as e:
-            print(f"[WARN] 네트워크 오류 ({attempt}/{max_retries}) → {e}")
-            continue
+        except Exception as e:
+            print(
+                f"[ERROR] 요청 중 예외 발생: {url} ({e}) "
+                f"(재시도 {attempt}/{max_retries})"
+            )
+            if attempt < max_retries:
+                # 네트워크 예외 시에도 지수형 딜레이 후 재시도
+                continue
+            return None
 
+        # 정상 응답
         if resp.status_code == 200:
-            print(f"[INFO] 요청 성공: {url}")
+            resp.encoding = resp.apparent_encoding
             return resp.text
 
+        # 403/429/503 → 접근 제한/과도한 요청/서비스 불가 → 재시도 후보
         if resp.status_code in (403, 429, 503):
-            print(f"[WARN] 상태코드 {resp.status_code} → 재시도 {attempt}/{max_retries}")
-            continue
+            print(
+                f"[WARN] 요청 실패: {url} (status={resp.status_code}), "
+                f"재시도 {attempt}/{max_retries}"
+            )
+            if attempt < max_retries:
+                # 다음 루프로 넘어가며 딜레이 포함 재시도
+                continue
+            # 마지막 시도까지 실패하면 포기
+            return None
 
-        print(f"[WARN] 예기치 못한 상태코드 {resp.status_code} → 재시도 중단")
-        break
+        # 그 외 상태코드: 재시도해도 의미 없다고 보고 바로 종료
+        print(f"[WARN] 요청 실패: {url} (status={resp.status_code})")
+        return None
 
-    print(f"[WARN] 최종 요청 실패. 마지막 상태코드: {last_status}")
+    print(f"[WARN] 재시도 후에도 HTML을 가져오지 못했습니다: {url} (마지막 status={last_status})")
     return None
 
+# ---------------------------------------------------------
+# HTML에서 키워드 링크와 모집기간 찾기
+# ---------------------------------------------------------
 
-# =========================================================
-# 공고 제목 파싱 (원래 구조와 비슷하게 유지)
-# =========================================================
-def parse_titles(html):
-    soup = BeautifulSoup(html, "html.parser")
-    titles = []
-    for a in soup.find_all("a"):
-        text = (a.text or "").strip()
+def extract_period(a_tag: Tag) -> str:
+    """
+    주어진 <a> 태그를 포함하는 블록에서 모집 기간을 추출한다.
+    - 모바일 구조 예시:
+        <li class="banner ...">
+          ...
+          <div class="banner-information ...">
+            <a class="banner-text-link" ...>
+              <div class="date-text">25.12.01~내일마감</div>
+              ...
+    """
+    # 우선 a_tag가 속한 최상위 <li>를 찾는다.
+    li = a_tag.find_parent("li")
+    if not li:
+        return "(모집기간 정보 없음)"
+
+    # 1) 모바일(hibrain m 사이트) 구조: .date-text 안에 기간이 들어있음
+    date_div = li.find("div", class_="date-text")
+    if date_div:
+        text = date_div.get_text(strip=True)
         if text:
-            titles.append(text)
-    return titles
+            # 예: "25.12.01~내일마감"
+            return text
+
+    # 2) 기존 PC 버전(또는 다른 구조) 대응: span.td_receipt 내부 숫자/특수기호 조합
+    li_row = li if ("row" in li.get("class", []) and "sortRoot" in li.get("class", [])) else li.find_parent("li", class_="row sortRoot")
+    if not li_row:
+        return "(모집기간 정보 없음)"
+
+    receipt_span = li_row.find("span", class_="td_receipt")
+    if not receipt_span:
+        return "(모집기간 정보 없음)"
+
+    period_parts = []
+    for content in receipt_span.contents:
+        if isinstance(content, Tag) and 'number' in content.get('class', []):
+            period_parts.append(content.get_text(strip=True))
+        elif isinstance(content, Tag) and 'specialCharacter' in content.get('class', []):
+            period_parts.append('~')
+        elif isinstance(content, str):
+            text = content.strip()
+            if text and text != '&nbsp;~&nbsp;':
+                period_parts.append(text)
+
+    period_str = "".join(period_parts).replace('~~', '~').strip()
+
+    if period_str and '~' in period_str:
+        return period_str
+
+    return "(모집기간 정보 없음)"
 
 
-# =========================================================
-# 이메일 발송 함수 - 요청하신 포맷 반영
-#   items: [ {"link": ..., "period": ...}, ... ]
-# =========================================================
-def send_email(keyword, items):
-    """
-    keyword별 신규 감지 내역을 이메일 포맷에 맞게 전송.
+def find_keyword_links_in_html(html: str, base_url: str, keyword: str, max_links: int = 2):
+    """HTML 본문에서 키워드가 포함된 <a> 링크와 모집 기간을 찾는다."""
+    soup = BeautifulSoup(html, "html.parser")
+    results = [] 
+    seen_urls = set()
 
-    items 예시 구조:
-    [
-      {"link": "https://...", "period": "25.11.28~25.12.10"},
-      ...
-    ]
+    parsed = urlparse(base_url)
+    origin = f"{parsed.scheme}://{parsed.netloc}"
 
-    실제 모집기간 추출 로직은 main() 쪽에서 items를 만들 때 채워주면 됩니다.
-    (여기서는 포맷만 책임)
-    """
-    smtp_host = os.environ.get("SMTP_HOST", "smtp.gmail.com")
-    smtp_port = int(os.environ.get("SMTP_PORT", "587"))
-    smtp_user = os.environ.get("SMTP_USER")
-    smtp_password = os.environ.get("SMTP_PASSWORD")
-    smtp_from = os.environ.get("SMTP_FROM", smtp_user)
-    smtp_to_raw = os.environ.get("SMTP_TO")  # 콤마로 여러 명 가능
+    for a in soup.find_all("a", href=True):
+        raw_href = a["href"].strip()
+        if not raw_href:
+            continue
 
-    if not (smtp_user and smtp_password and smtp_to_raw and smtp_from):
-        print("[WARN] SMTP 환경변수가 부족하여 이메일을 보낼 수 없습니다.")
-        print("       (SMTP_USER, SMTP_PASSWORD, SMTP_TO, SMTP_FROM 필요)")
-        return
+        if raw_href.lower().startswith(("javascript:", "mailto:", "#")):
+            continue
 
-    to_addrs = [addr.strip() for addr in smtp_to_raw.split(",") if addr.strip()]
+        if raw_href.startswith(("http://", "https://")):
+            href_abs = raw_href
+        else:
+            href_abs = urljoin(origin, raw_href) 
 
-    subject = "[Hibrain 임용 알리미] 지정 키워드 신규 감지 결과"
+        text = a.get_text(" ", strip=True)
+        if not text:
+            continue
 
+        if keyword in text:
+            if href_abs not in seen_urls:
+                period = extract_period(a)
+                results.append((href_abs, period))
+                seen_urls.add(href_abs)
+                if len(results) >= max_links:
+                    break
+
+    return results 
+
+# ---------------------------------------------------------
+# 이메일 본문 생성
+# ---------------------------------------------------------
+
+def build_email_body(matches: dict):
+    """matches 딕셔너리를 기반으로 이메일 본문을 생성한다."""
     lines = []
-    lines.append(subject)
-    lines.append("")
-    # 키워드 블록
-    # 예: ■ 키워드: 경희대학교 (모집기간: 25.11.28~25.12.10)
-    #       - 관련 링크 1: https://....
-    period_str = None
-    if items and isinstance(items[0], dict):
-        period_str = items[0].get("period")  # 대표 모집기간 (필요시 확장 가능)
+    lines.append("[Hibrain 임용 알리미] 지정 키워드 신규 감지 결과\n")
 
-    if period_str:
-        lines.append(u"■ 키워드: {kw} (모집기간: {p})".format(kw=keyword, p=period_str))
-    else:
-        lines.append(u"■ 키워드: {kw}".format(kw=keyword))
+    for kw, link_periods in matches.items():
+        period_info = link_periods[0][1] if link_periods else "(모집기간 정보 없음)"
+        lines.append(f"■ 키워드: {kw} (모집기간: {period_info})")
+        
+        if link_periods:
+            for i, (u, _) in enumerate(link_periods, start=1):
+                lines.append(f"  - 관련 링크 {i}: {u}")
+        else:
+            lines.append("  - (키워드 주변 링크 없음)")
+        lines.append("")
 
-    for idx, item in enumerate(items, start=1):
-        link = item.get("link") if isinstance(item, dict) else str(item)
-        lines.append(u"  - 관련 링크 {i}: {link}".format(i=idx, link=link))
-
-    lines.append("")
-    lines.append("※ 이 메일은 자동으로 발송되었습니다.")
-    lines.append("")
     lines.append("-----")
     lines.append("GitHub Repo Address:")
     lines.append("https://github.com/leemgs/hibrain-prof-notifier/")
 
-    body = "\n".join(lines)
+    return "\n".join(lines)
+
+# ---------------------------------------------------------
+# 이메일 발송
+# ---------------------------------------------------------
+
+def send_email(subject: str, body: str):
+    gmail_user = os.environ.get("GMAIL_USER")
+    gmail_app_password = os.environ.get("GMAIL_APP_PASSWORD")
+    target_email = os.environ.get("TARGET_EMAIL")
+
+    if not all([gmail_user, gmail_app_password, target_email]):
+        raise RuntimeError("GMAIL_USER, GMAIL_APP_PASSWORD, TARGET_EMAIL 환경변수를 모두 설정해야 합니다.")
 
     msg = MIMEText(body, _charset="utf-8")
     msg["Subject"] = subject
-    msg["From"] = formataddr(("Hibrain 임용 알리미", smtp_from))
-    msg["To"] = ", ".join(to_addrs)
+    msg["From"] = gmail_user
+    msg["To"] = target_email
 
-    try:
-        with smtplib.SMTP(smtp_host, smtp_port) as server:
-            server.starttls()
-            server.login(smtp_user, smtp_password)
-            server.sendmail(smtp_from, to_addrs, msg.as_string())
-        print(f"[INFO] 이메일 발송 완료 (키워드: {keyword}, 수신자: {msg['To']})")
-    except Exception as e:
-        print("[ERROR] 이메일 발송 실패:", e)
+    with smtplib.SMTP_SSL("smtp.gmail.com", 465) as smtp:
+        smtp.login(gmail_user, gmail_app_password)
+        smtp.send_message(msg)
 
+    print("이메일 발송 완료")
 
-# =========================================================
-# 메인 로직 (period는 placeholder, 실제 로직에 맞게 수정 가능)
-# =========================================================
+# ---------------------------------------------------------
+# 메인 로직
+# ---------------------------------------------------------
+
 def main():
-    print("로드된 키워드:", KEYWORDS)
-    if not CONFIG_URLS:
-        print("[WARN] web_addresses가 설정되어 있지 않습니다.")
+    keywords = load_keywords()
+    print(f"로드된 키워드: {keywords}")
+
+    html_pages = []
+
+    for u in CONFIG_URLS:
+        t = random.uniform(1.0, 3.0)
+        print(f"[{u}] 접근 전 {t:.2f}초 대기...")
+        time.sleep(t)
+
+        html = fetch_page(u)
+        if html:
+            html_pages.append((u, html))
+        else:
+            print(f"[WARN] HTML을 가져오지 못함: {u}")
+
+    if not html_pages:
+        print("[WARN] 어떤 URL에서도 HTML을 가져오지 못했습니다. 이메일 발송 없음.")
         return
 
-    # detected 구조 예:
-    # { "경희대학교": [ {"link": ..., "period": ...}, ... ], ... }
-    detected = {}
+    matches = {}
 
-    for url in CONFIG_URLS:
-        html = fetch_page(url)
-        if not html:
-            print(f"[WARN] HTML을 가져오지 못해 건너뜀: {url}")
-            continue
+    for kw in keywords:
+        found = []
+        for base, html in html_pages:
+            pairs = find_keyword_links_in_html(html, base, kw, max_links=MAX_LINKS)
+            if pairs:
+                found.extend(pairs)
 
-        titles = parse_titles(html)
+        if found:
+            unique = []
+            seen = set()
+            for url, period in found:
+                if url not in seen:
+                    unique.append((url, period))
+                    seen.add(url)
+                    if len(unique) >= MAX_LINKS:
+                        break
+            if unique:
+                matches[kw] = unique
 
-        for kw in KEYWORDS:
-            matched = [t for t in titles if kw in t]
-            if not matched:
-                continue
-
-            if kw not in detected:
-                detected[kw] = []
-
-            # ★ 여기서 실제 코드에 맞게 모집기간을 추출해서 넣으면 됨
-            #   현재는 placeholder로 "알 수 없음"을 사용
-            period_placeholder = "알 수 없음"
-
-            # 너무 많으면 상위 MAX_LINKS개만
-            use_count = len(matched)
-            if MAX_LINKS and MAX_LINKS > 0:
-                use_count = min(use_count, MAX_LINKS)
-
-            for i in range(use_count):
-                detected[kw].append({
-                    "link": url,
-                    "period": period_placeholder,
-                })
-
-    if not detected:
-        print("[INFO] 신규 감지된 공고가 없습니다. 이메일 발송 없음.")
+    if not matches:
+        print("키워드 관련 링크 없음. 이메일 발송하지 않음.")
         return
 
-    for kw, items in detected.items():
-        send_email(kw, items)
+    body = build_email_body(matches)
+    subject = f"[Hibrain] 임용 공지 알리미 (최대 {MAX_LINKS}개 링크)"
 
+    print("=== 이메일 미리보기 ===")
+    print("Subject:", subject)
+    print(body)
+    print("=======================")
+
+    send_email(subject, body)
 
 if __name__ == "__main__":
     main()
