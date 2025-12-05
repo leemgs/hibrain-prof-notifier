@@ -3,7 +3,7 @@ name: Hibrain 교수 임용 소식 알리미
 on:
   schedule:
     # 매일 8시간마다 실행하기 (UTC 기준)
-    - cron: "0 */8 * * *"
+    - cron: "0 */6 * * *"
   workflow_dispatch:  # 수동 실행용
 
 jobs:
