@@ -292,9 +292,10 @@ def find_keyword_links_in_html(html: str, base_url: str, keyword: str, max_links
 
 def build_email_body(matches: dict):
     """matches 딕셔너리를 기반으로 이메일 본문을 생성한다."""
+    ip = get_public_ip() 
     lines = []
     lines.append("[Hibrain 임용 알리미] 지정 키워드 신규 감지 결과\n")
-
+    lines.append(f"- 깃허브 액션 IP주소: {ip}\n")
     for kw, link_periods in matches.items():
         period_info = link_periods[0][1] if link_periods else "(모집기간 정보 없음)"
         lines.append(f"■ 키워드: {kw} (모집기간: {period_info})")
