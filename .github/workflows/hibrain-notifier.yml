@@ -3,8 +3,8 @@ name: Hibrain 교수 임용 소식 알리미
 on:
   schedule:
     # KST 기준: 08:00, 20:00 실행
-    # UTC 기준: 23:00, 11:00 (실행Default)
-    - cron: "0 23,11 * * *"    
+    # UTC 기준: 23:00, 11:00
+    - cron: "0 23,11 * * *"
   workflow_dispatch:  # 수동 실행용
 
 permissions:
@@ -13,9 +13,9 @@ permissions:
 
 jobs:
   check-hibrain:
-  # runs-on: ubuntu-latest 
-  runs-on: self-hosted
-  
+    # runs-on: ubuntu-latest
+    runs-on: self-hosted
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -35,10 +35,6 @@ jobs:
           GMAIL_USER: ${{ secrets.GMAIL_USER }}
           GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
           TARGET_EMAIL: ${{ secrets.TARGET_EMAIL }}
-
-          # Issue 생성에 필요한 GitHub 환경변수
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # GITHUB_REPOSITORY는 Actions가 자동으로 채움
-          # 예시: leemgs/hibrain-prof-notifier
         run: |
           python main.py
