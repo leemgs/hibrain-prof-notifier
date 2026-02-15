@@ -4,7 +4,7 @@ on:
   schedule:
     # KST 기준: 08:00, 20:00 실행
     # UTC 기준: 23:00, 11:00
-    - cron: "0 23,11 * * *"
+    - cron: "0 23 * * *"
   workflow_dispatch:  # 수동 실행용
 
 permissions:
