@@ -443,7 +443,7 @@ def main():
         return
 
     body = build_email_body(matches)
-    subject = f"[Hibrain] 임용 공지 알리미 (최대 {MAX_LINKS}개 링크)"
+    subject = f"[Hibrain] 임용 공지 알리미 (최대 {MAX_LINKS}개 링크, Self-hosted)"
 
     log("=== 이메일/Issue 미리보기 ===")
     log(f"Subject: {subject}")
