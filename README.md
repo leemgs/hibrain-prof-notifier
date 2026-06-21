@@ -27,6 +27,8 @@ GitHub Actions 또는 로컬 PC에서 실행할 수 있습니다.
 ├── config.json         # 설정 파일 (User-Agent, 대상 URL 등)
 ├── keywords.txt        # 검색할 대학교 키워드 목록
 ├── requirements.txt    # 필요한 Python 패키지
+├── data/
+│   └── email.json      # 이메일 전송 상세 설정 (SMTP 서버, 수신인 등)
 └── README.md           # 프로젝트 설명
 ```
 
@@ -47,18 +49,34 @@ cd hibrain-prof-notifier
 pip install -r requirements.txt
 ```
 
-### 3) 환경 변수 설정
+### 3) 이메일 설정 및 환경 변수 설정
 
-Gmail SMTP를 사용하므로 아래 3개를 반드시 설정해야 합니다.
+이메일 발송 계정 및 수신인 등의 설정은 `./data/email.json` 파일에서 관리합니다. 보안을 필요로 하는 SMTP 비밀번호(`SMTP_PASS`)만 환경변수 또는 GitHub Secrets로 주입합니다.
 
-```bash
-export GMAIL_USER="your@gmail.com"
-export GMAIL_APP_PASSWORD="your_google_app_password"
-export TARGET_EMAIL="notify@yourdomain.com"
+#### 1. `./data/email.json` 파일 설정
+기본 템플릿 파일이 제공되며, 상황에 맞게 편집하여 사용합니다. 수신인(`receivers`)은 배열 형식으로 여러 명을 지정할 수 있습니다.
+
+```json
+{
+  "_comment": "receiver의 이메일 주소는 회사 이메일의 경우에 회사 방화벽에서 이메일의 수신자체를 막거나, 스팸함으로 분류되는 경우가 많습니다.",
+  "smtp_host": "smtp.gmail.com",
+  "smtp_port": 465,
+  "smtp_user": "leemgs@gmail.com",
+  "sender": "leemgs@gmail.com",
+  "receivers": [
+    "leemgs@gmail.com"
+  ]
+}
 ```
 
-> ❗ Gmail에서는 앱 비밀번호(App Password)가 필요합니다.
-> 2단계 인증 활성화 후 발급하세요.
+#### 2. 환경 변수 설정
+이메일 비밀번호(앱 비밀번호)만 환경 변수로 지정합니다. (하위 호환성을 위해 `GMAIL_APP_PASSWORD`도 지원합니다.)
+
+```bash
+export SMTP_PASS="your_google_app_password"
+```
+
+> ❗ Gmail을 사용하는 경우, 2단계 인증 활성화 후 생성한 **앱 비밀번호**를 입력해야 합니다.
 
 ### 4) 실행
 
@@ -146,30 +164,29 @@ https://github.com/leemgs/hibrain-prof-notifier/
 
 ## 🕒 GitHub Actions 자동 실행 설정 (예시)
 
-`.github/workflows/notify.yml`
+`.github/workflows/hibrain-notifier.yml`
 
 ```yaml
 name: Hibrain Notifier
 
 on:
   schedule:
-    - cron: "0 */4 * * *"
+    # KST 기준: 08:00, 20:00 실행 (UTC 기준: 23:00, 11:00)
+    - cron: "0 23 * * *"
   workflow_dispatch:
 
 jobs:
   run:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-python@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
         with:
-          python-version: 3.11
+          python-version: "3.11"
       - run: pip install -r requirements.txt
       - run: python main.py
         env:
-          GMAIL_USER: ${{ secrets.GMAIL_USER }}
-          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
-          TARGET_EMAIL: ${{ secrets.TARGET_EMAIL }}
+          SMTP_PASS: ${{ secrets.SMTP_PASS }}
 ```
 
 ---

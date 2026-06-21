@@ -318,21 +318,74 @@ def build_email_body(matches: dict):
 # ---------------------------------------------------------
 
 def send_email(subject: str, body: str):
-    gmail_user = os.environ.get("GMAIL_USER")
-    gmail_app_password = os.environ.get("GMAIL_APP_PASSWORD")
-    target_email = os.environ.get("TARGET_EMAIL")
+    # 1. 기본값 설정 및 email.json 로드
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    email_json_path = os.path.join(base_dir, "data", "email.json")
+    
+    smtp_host = "smtp.gmail.com"
+    smtp_port = 465
+    smtp_user = None
+    sender = None
+    receivers = []
+    
+    if os.path.exists(email_json_path):
+        try:
+            with open(email_json_path, "r", encoding="utf-8") as f:
+                email_cfg = json.load(f)
+                smtp_host = email_cfg.get("smtp_host", smtp_host)
+                smtp_port = int(email_cfg.get("smtp_port", smtp_port))
+                smtp_user = email_cfg.get("smtp_user")
+                sender = email_cfg.get("sender", smtp_user)
+                
+                recv_val = email_cfg.get("receivers", [])
+                if isinstance(recv_val, list):
+                    receivers = recv_val
+                elif isinstance(recv_val, str):
+                    receivers = [recv_val]
+        except Exception as e:
+            log(f"[WARN] 이메일 설정 파일(email.json) 파싱 실패: {e}")
 
-    if not all([gmail_user, gmail_app_password, target_email]):
-        raise RuntimeError("GMAIL_USER, GMAIL_APP_PASSWORD, TARGET_EMAIL 환경변수를 모두 설정해야 합니다.")
+    # 2. 환경변수 오버라이드 및 폴백 지원
+    env_smtp_user = os.environ.get("GMAIL_USER")
+    env_target_email = os.environ.get("TARGET_EMAIL")
+    smtp_pass = os.environ.get("SMTP_PASS") or os.environ.get("GMAIL_APP_PASSWORD")
+    
+    if env_smtp_user:
+        smtp_user = env_smtp_user
+        sender = env_smtp_user
+    if env_target_email:
+        receivers = [env_target_email]
 
+    # 유효성 검증
+    if not smtp_pass:
+        raise RuntimeError("SMTP_PASS (또는 GMAIL_APP_PASSWORD) 환경변수를 설정해야 합니다.")
+    if not smtp_user:
+        raise RuntimeError("SMTP 사용자 계정(smtp_user)이 지정되지 않았습니다.")
+    if not receivers:
+        raise RuntimeError("수신자 이메일(receivers)이 지정되지 않았습니다.")
+
+    to_addrs = [r.strip() for r in receivers if r.strip()]
     msg = MIMEText(body, _charset="utf-8")
     msg["Subject"] = subject
-    msg["From"] = gmail_user
-    msg["To"] = target_email
+    msg["From"] = sender
+    msg["To"] = ", ".join(to_addrs)
 
-    with smtplib.SMTP_SSL("smtp.gmail.com", 465) as smtp:
-        smtp.login(gmail_user, gmail_app_password)
-        smtp.send_message(msg)
+    log(f"[INFO] 이메일 발송 시도... Host: {smtp_host}, Port: {smtp_port}, User: {smtp_user}, To: {to_addrs}")
+
+    if smtp_port == 465:
+        # SSL 발송
+        with smtplib.SMTP_SSL(smtp_host, smtp_port, timeout=20) as smtp:
+            smtp.login(smtp_user, smtp_pass)
+            smtp.send_message(msg)
+    else:
+        # STARTTLS 발송 (예: 587)
+        import ssl
+        ctx = ssl.create_default_context()
+        with smtplib.SMTP(smtp_host, smtp_port, timeout=20) as smtp:
+            smtp.ehlo()
+            smtp.starttls(context=ctx)
+            smtp.login(smtp_user, smtp_pass)
+            smtp.sendmail(sender, to_addrs, msg.as_string())
 
     log("이메일 발송 완료")
 
