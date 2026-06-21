@@ -24,11 +24,13 @@ GitHub Actions 또는 로컬 PC에서 실행할 수 있습니다.
 ```bash
 .
 ├── main.py             # 메인 실행 파일
+├── weekly_summary.py   # 주간 채용 공지 현황 요약 스크립트
 ├── config.json         # 설정 파일 (User-Agent, 대상 URL 등)
 ├── keywords.txt        # 검색할 대학교 키워드 목록
 ├── requirements.txt    # 필요한 Python 패키지
 ├── data/
-│   └── email.json      # 이메일 전송 상세 설정 (SMTP 서버, 수신인 등)
+│   ├── email.json      # 이메일 전송 상세 설정 (SMTP 서버, 수신인 등)
+│   └── university_hiring_status.json # [자동 생성] 주간 교수 채용 현황 요약 데이터
 └── README.md           # 프로젝트 설명
 ```
 
@@ -197,6 +199,19 @@ jobs:
 2. `web_addresses`에 m.hibrain.net URL 사용
 3. `print()` 로그로 파싱되는 기간·링크 확인
 4. Gmail SMTP 오류가 있으면 앱 비밀번호 확인
+
+---
+
+## 📊 주간 채용 공지 현황 요약 및 자동 커밋 (Activity 유지)
+
+GitHub Actions는 60일 동안 저장소에 커밋 등 코드 변화가 전혀 없으면 크론(Schedule) 실행이 자동으로 중단되는 정책이 있습니다. 이를 방지하고 매주 채용 현황을 요약하기 위해 다음이 구성되어 있습니다:
+
+1. **주간 집계 스크립트 (`weekly_summary.py`)**: 
+   * 매주 월~금요일 동안 깃허브 Issue에 등록된 알림 데이터들을 수집 및 파싱합니다.
+   * 중복을 최신 정보 기준으로 필터링하여 대학교별 모집 기간 및 공지 링크 목록을 정리한 `data/university_hiring_status.json` 파일을 업데이트합니다.
+2. **주간 자동 커밋 워크플로우 (`.github/workflows/weekly-summary.yml`)**:
+   * 매주 토요일 오전 9시(KST)에 동작하여 위 요약 스크립트를 수행합니다.
+   * `data/university_hiring_status.json` 파일에 변경이 생기면 자동으로 커밋 및 푸시하여 저장소를 활성화된 상태로 유지합니다.
 
 ---
 

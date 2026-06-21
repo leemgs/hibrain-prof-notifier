@@ -1,0 +1,54 @@
+name: Weekly Academic Hiring Summary
+
+on:
+  schedule:
+    # 매주 토요일 오전 9시 KST (UTC 금요일 24:00)
+    - cron: "0 0 * * 6"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  issues: read
+
+jobs:
+  build-summary:
+    runs-on: self-hosted
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run weekly summary script
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: |
+          python weekly_summary.py
+
+      - name: Commit and push changes
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          
+          # 변경사항 등록
+          git add data/university_hiring_status.json
+          
+          # 변경 사항이 존재할 경우에만 커밋 및 푸시
+          if ! git diff --cached --quiet; then
+            git commit -m "chore: Update weekly hiring status [skip ci]"
+            git push origin main
+          else
+            echo "No changes detected in university_hiring_status.json. Skipping commit."
+          fi
