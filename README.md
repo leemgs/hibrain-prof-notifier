@@ -14,8 +14,10 @@ GitHub Actions 또는 로컬 PC에서 실행할 수 있습니다.
 * 🛡 **403 방지를 위한 브라우저 UA·헤더·세션 자동 설정**
 * 📅 **모집 기간 자동 추출**
   예: `25.12.01~내일마감`
-* 📧 **이메일 자동 발송(Gmail SMTP)**
-* ⚡ **Github Actions 스케줄링 지원**
+* 📧 **이메일 자동 발송(Gmail SMTP)** — 가독성 높은 **HTML 카드 디자인** + 평문(plain text) 폴백을 함께 전송
+* 🐙 **GitHub Issue 자동 생성** — 감지 결과를 Issue로도 기록 (주간 요약의 데이터 소스)
+* ⚡ **GitHub Actions 스케줄링 지원**
+* 📊 **주간 채용 현황 자동 집계 및 커밋** (저장소 Activity 유지)
 
 ---
 
@@ -23,14 +25,18 @@ GitHub Actions 또는 로컬 PC에서 실행할 수 있습니다.
 
 ```bash
 .
-├── main.py             # 메인 실행 파일
+├── main.py             # 메인 실행 파일 (크롤링 → HTML 이메일 발송 → Issue 생성)
 ├── weekly_summary.py   # 주간 채용 공지 현황 요약 스크립트
-├── config.json         # 설정 파일 (User-Agent, 대상 URL 등)
+├── config.json         # 설정 파일 (User-Agent, 대상 URL, max_links)
 ├── keywords.txt        # 검색할 대학교 키워드 목록
-├── requirements.txt    # 필요한 Python 패키지
+├── requirements.txt    # 필요한 Python 패키지 (requests, beautifulsoup4)
 ├── data/
-│   ├── email.json      # 이메일 전송 상세 설정 (SMTP 서버, 수신인 등)
+│   ├── email.json      # 이메일 전송 상세 설정 (SMTP 서버, 발신/수신인 등)
 │   └── university_hiring_status.json # [자동 생성] 주간 교수 채용 현황 요약 데이터
+├── .github/
+│   └── workflows/
+│       ├── hibrain-notifier.yml   # 일일 임용 공지 알림 워크플로우
+│       └── weekly-summary.yml     # 주간 현황 집계 + 자동 커밋 워크플로우
 └── README.md           # 프로젝트 설명
 ```
 
@@ -108,12 +114,16 @@ python main.py
 각 줄마다 한 개의 대학교 이름을 적습니다.
 
 ```
-성결대학교
 경희대학교
 아주대학교
+명지대학교
+경기대학교
+수원대학교
 용인대학교
+강남대학교
 한신대학교
-...
+협성대학교
+성결대학교
 ```
 
 ---
@@ -151,34 +161,55 @@ Hibrain 모바일 페이지 구조에 맞춘 자동 파싱:
 
 ## 📧 이메일 예시
 
+이메일은 **HTML 카드 디자인**으로 발송되며, HTML을 지원하지 않는 클라이언트를 위해 아래와 같은 **평문(plain text) 폴백**이 함께 전송됩니다(`multipart/alternative`).
+
+* 상단 헤더: 감지된 키워드/링크 건수 요약
+* 키워드별 카드: 학교명 · 모집기간 배지 · 번호가 매겨진 공고 링크
+* 푸터: GitHub Actions 실행 IP · 저장소 주소
+
+평문 폴백 예시:
+
 ```
 [Hibrain 임용 알리미] 지정 키워드 신규 감지 결과
 
-■ 키워드: 건국대학교 (모집기간: 25.12.01~내일마감)
+- 깃허브 액션 IP주소: 59.12.126.245
+
+■ 키워드: 아주대학교 (모집기간: 26.06.24~26.07.12)
   - 관련 링크 1: https://m.hibrain.net/recruitment/...
+  - 관련 링크 2: https://m.hibrain.net/recruitment/...
 
 -----
 GitHub Repo Address:
 https://github.com/leemgs/hibrain-prof-notifier/
 ```
 
+> 참고: GitHub Issue 본문에도 위 평문 형식이 그대로 기록되며, 이 형식을 주간 요약 스크립트(`weekly_summary.py`)가 파싱합니다.
+
 ---
 
-## 🕒 GitHub Actions 자동 실행 설정 (예시)
+## 🕒 GitHub Actions 자동 실행 설정
 
-`.github/workflows/hibrain-notifier.yml`
+저장소에는 두 개의 워크플로우가 구성되어 있습니다.
+
+### 1) 일일 알림 — `.github/workflows/hibrain-notifier.yml`
+
+매일 KST 08:00(UTC 23:00)에 실행되어 신규 공지를 감지하고 이메일·Issue를 발송합니다.
 
 ```yaml
-name: Hibrain Notifier
+name: Hibrain 교수 임용 소식 알리미
 
 on:
   schedule:
-    # KST 기준: 08:00, 20:00 실행 (UTC 기준: 23:00, 11:00)
+    # KST 08:00 실행 (UTC 23:00)
     - cron: "0 23 * * *"
-  workflow_dispatch:
+  workflow_dispatch:  # 수동 실행용
+
+permissions:
+  contents: read
+  issues: write       # Issue 생성 권한
 
 jobs:
-  run:
+  check-hibrain:
     runs-on: self-hosted
     steps:
       - uses: actions/checkout@v4
@@ -189,7 +220,14 @@ jobs:
       - run: python main.py
         env:
           SMTP_PASS: ${{ secrets.SMTP_PASS }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 ```
+
+> ⚠️ 필요한 시크릿: `SMTP_PASS`(Gmail 앱 비밀번호). `GITHUB_TOKEN`은 Actions가 자동 제공합니다.
+
+### 2) 주간 요약 — `.github/workflows/weekly-summary.yml`
+
+매주 토요일 KST 09:00(UTC 00:00)에 실행되어 직전 월~금 알림을 집계하고 `data/university_hiring_status.json`을 자동 커밋·푸시합니다. (자세한 내용은 아래 **「주간 채용 공지 현황 요약 및 자동 커밋」** 섹션 참조)
 
 ---
 
