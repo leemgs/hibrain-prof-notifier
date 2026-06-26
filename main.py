@@ -5,6 +5,7 @@ import os
 import json
 import smtplib
 from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 from urllib.parse import urljoin, urlparse
 
 import requests
@@ -290,9 +291,13 @@ def find_keyword_links_in_html(html: str, base_url: str, keyword: str, max_links
 # 이메일 본문 생성
 # ---------------------------------------------------------
 
-def build_email_body(matches: dict):
-    """matches 딕셔너리를 기반으로 이메일 본문을 생성한다."""
-    ip = get_public_ip() 
+REPO_URL = "https://github.com/leemgs/hibrain-prof-notifier/"
+
+
+def build_email_body(matches: dict, ip: str | None = None):
+    """matches 딕셔너리를 기반으로 평문(plain text) 이메일 본문을 생성한다."""
+    if ip is None:
+        ip = get_public_ip()
     lines = []
     lines.append("[Hibrain 임용 알리미] 지정 키워드 신규 감지 결과\n")
     lines.append(f"- 깃허브 액션 IP주소: {ip}\n")
@@ -309,15 +314,148 @@ def build_email_body(matches: dict):
 
     lines.append("-----")
     lines.append("GitHub Repo Address:")
-    lines.append("https://github.com/leemgs/hibrain-prof-notifier/")
+    lines.append(REPO_URL)
 
     return "\n".join(lines)
+
+
+def _esc(text: str) -> str:
+    """HTML 특수문자 이스케이프."""
+    return (
+        str(text)
+        .replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+        .replace('"', "&quot;")
+    )
+
+
+def build_email_html(matches: dict, ip: str | None = None):
+    """matches 딕셔너리를 기반으로 가독성 높은 HTML 이메일 본문을 생성한다.
+
+    이메일 클라이언트(Gmail 등) 호환성을 위해 모든 스타일은 인라인으로 작성한다.
+    """
+    if ip is None:
+        ip = get_public_ip()
+
+    total_kw = len(matches)
+    total_links = sum(len(v) for v in matches.values())
+
+    # 카드 색상 팔레트 (키워드별로 순환)
+    accents = ["#2563eb", "#0891b2", "#7c3aed", "#db2777", "#ea580c", "#16a34a"]
+
+    cards = []
+    for idx, (kw, link_periods) in enumerate(matches.items()):
+        accent = accents[idx % len(accents)]
+        period_info = link_periods[0][1] if link_periods else "모집기간 정보 없음"
+
+        link_rows = []
+        if link_periods:
+            for i, (u, _) in enumerate(link_periods, start=1):
+                link_rows.append(
+                    f'''
+                    <tr>
+                      <td style="padding:6px 0;vertical-align:top;">
+                        <span style="display:inline-block;min-width:22px;height:22px;line-height:22px;text-align:center;
+                                     background:{accent};color:#ffffff;border-radius:11px;font-size:12px;font-weight:700;
+                                     margin-right:10px;">{i}</span>
+                        <a href="{_esc(u)}" target="_blank"
+                           style="color:{accent};text-decoration:none;font-size:14px;word-break:break-all;font-weight:600;">
+                           공고 바로가기 →
+                        </a>
+                        <div style="color:#94a3b8;font-size:11px;margin:2px 0 0 32px;word-break:break-all;">{_esc(u)}</div>
+                      </td>
+                    </tr>'''
+                )
+        else:
+            link_rows.append(
+                '<tr><td style="padding:6px 0;color:#94a3b8;font-size:14px;">키워드 주변 링크 없음</td></tr>'
+            )
+
+        cards.append(
+            f'''
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0"
+                   style="margin:0 0 16px 0;border:1px solid #e2e8f0;border-left:4px solid {accent};
+                          border-radius:10px;background:#ffffff;">
+              <tr>
+                <td style="padding:18px 20px;">
+                  <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                    <tr>
+                      <td style="font-size:18px;font-weight:800;color:#0f172a;">🎓 {_esc(kw)}</td>
+                      <td align="right" style="white-space:nowrap;">
+                        <span style="display:inline-block;background:#f1f5f9;color:#475569;font-size:12px;font-weight:600;
+                                     padding:5px 12px;border-radius:20px;">🗓 {_esc(period_info)}</span>
+                      </td>
+                    </tr>
+                  </table>
+                  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:10px;">
+                    {''.join(link_rows)}
+                  </table>
+                </td>
+              </tr>
+            </table>'''
+        )
+
+    html = f'''<!DOCTYPE html>
+<html lang="ko">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background:#f1f5f9;
+             font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Apple SD Gothic Neo','Malgun Gothic',sans-serif;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f1f5f9;padding:24px 12px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="600" cellpadding="0" cellspacing="0"
+               style="max-width:600px;width:100%;">
+
+          <!-- 헤더 -->
+          <tr>
+            <td style="background:linear-gradient(135deg,#1e3a8a 0%,#2563eb 100%);
+                       border-radius:12px 12px 0 0;padding:28px 28px 24px 28px;">
+              <div style="color:#bfdbfe;font-size:13px;font-weight:600;letter-spacing:1px;">HIBRAIN · 임용 공지 알리미</div>
+              <div style="color:#ffffff;font-size:24px;font-weight:800;margin-top:6px;">지정 키워드 신규 감지 🔔</div>
+              <div style="color:#dbeafe;font-size:14px;margin-top:8px;">
+                키워드 <b style="color:#ffffff;">{total_kw}</b>건 · 공고 링크 <b style="color:#ffffff;">{total_links}</b>건이 새로 감지되었습니다.
+              </div>
+            </td>
+          </tr>
+
+          <!-- 본문 -->
+          <tr>
+            <td style="background:#f8fafc;padding:22px 22px 6px 22px;">
+              {''.join(cards)}
+            </td>
+          </tr>
+
+          <!-- 푸터 -->
+          <tr>
+            <td style="background:#f8fafc;border-radius:0 0 12px 12px;padding:12px 22px 24px 22px;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0"
+                     style="border-top:1px solid #e2e8f0;padding-top:16px;">
+                <tr>
+                  <td style="color:#94a3b8;font-size:12px;line-height:1.7;">
+                    🌐 GitHub Actions IP: <span style="color:#475569;font-weight:600;">{_esc(ip)}</span><br>
+                    📦 Repository:
+                    <a href="{REPO_URL}" target="_blank" style="color:#2563eb;text-decoration:none;">{REPO_URL}</a><br>
+                    <span style="color:#cbd5e1;">본 메일은 자동 발송되었습니다 · Self-hosted</span>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>'''
+    return html
 
 # ---------------------------------------------------------
 # 이메일 발송
 # ---------------------------------------------------------
 
-def send_email(subject: str, body: str):
+def send_email(subject: str, body: str, html_body: str | None = None):
     # 1. 기본값 설정 및 email.json 로드
     base_dir = os.path.dirname(os.path.abspath(__file__))
     email_json_path = os.path.join(base_dir, "data", "email.json")
@@ -365,7 +503,14 @@ def send_email(subject: str, body: str):
         raise RuntimeError("수신자 이메일(receivers)이 지정되지 않았습니다.")
 
     to_addrs = [r.strip() for r in receivers if r.strip()]
-    msg = MIMEText(body, _charset="utf-8")
+
+    if html_body:
+        # 평문 + HTML 멀티파트 (HTML 미지원 클라이언트는 평문 표시)
+        msg = MIMEMultipart("alternative")
+        msg.attach(MIMEText(body, "plain", _charset="utf-8"))
+        msg.attach(MIMEText(html_body, "html", _charset="utf-8"))
+    else:
+        msg = MIMEText(body, _charset="utf-8")
     msg["Subject"] = subject
     msg["From"] = sender
     msg["To"] = ", ".join(to_addrs)
@@ -495,7 +640,9 @@ def main():
         log("키워드 관련 링크 없음. 이메일/Issue 발송하지 않음.")
         return
 
-    body = build_email_body(matches)
+    ip = get_public_ip()
+    body = build_email_body(matches, ip)
+    html_body = build_email_html(matches, ip)
     subject = f"[Hibrain] 임용 공지 알리미 (최대 {MAX_LINKS}개 링크, Self-hosted)"
 
     log("=== 이메일/Issue 미리보기 ===")
@@ -503,8 +650,8 @@ def main():
     log(body)
     log("=======================")
 
-    # 이메일 발송
-    send_email(subject, body)
+    # 이메일 발송 (HTML + 평문 멀티파트)
+    send_email(subject, body, html_body=html_body)
 
     # GitHub Issue 생성
     create_github_issue(subject, body)
