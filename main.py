@@ -26,6 +26,28 @@ USER_AGENT = CONFIG.get("browser_user_agent")
 CONFIG_URLS = CONFIG.get("web_addresses", [])
 MAX_LINKS = CONFIG.get("max_links", 2)
 
+# 교수 임용(채용) 공고만 수집하기 위한 제목 필터
+#  - include: 제목에 아래 단어 중 하나 이상이 있어야 함 (교수/교원 채용 신호)
+#  - exclude: 아래 단어가 제목에 있으면 교수 임용이 아니라고 보고 제외
+#    (Post-Doc/박사후연구원, 시간강사 등 비전임 직군)
+FACULTY_INCLUDE_TERMS = CONFIG.get("faculty_include_terms") or ["교수", "교원", "초빙", "임용"]
+FACULTY_EXCLUDE_TERMS = CONFIG.get("faculty_exclude_terms") or [
+    "Post-Doc", "Postdoc", "Post Doc", "포닥", "박사후", "시간강사",
+]
+
+
+def is_faculty_posting(title: str) -> bool:
+    """공고 제목이 '교수 임용(채용)' 공고인지 판별한다.
+
+    include 단어 중 하나 이상을 포함하면서 exclude 단어는 포함하지 않아야 한다.
+    """
+    if not title:
+        return False
+    low = title.lower()
+    if any(ex.lower() in low for ex in FACULTY_EXCLUDE_TERMS):
+        return False
+    return any(inc.lower() in low for inc in FACULTY_INCLUDE_TERMS)
+
 # 전역 세션 및 기본 헤더 설정 (403 완화용)
 SESSION = requests.Session()
 BASE_HEADERS = {
@@ -252,7 +274,13 @@ def extract_period(a_tag: Tag) -> str:
 
 
 def find_keyword_links_in_html(html: str, base_url: str, keyword: str, max_links: int = 2):
-    """HTML 본문에서 키워드가 포함된 <a> 링크와 모집 기간을 찾는다."""
+    """HTML 본문에서 키워드가 포함된 '교수 임용(채용)' 공고 링크를 찾는다.
+
+    반환값: (절대 URL, 모집기간, 공고 제목) 튜플의 리스트.
+    키워드(대학명)가 제목에 포함되면서, 동시에 교수 임용 공고로 판별된
+    (is_faculty_posting) 링크만 수집한다. → 기업/연구원/Post-Doc/시간강사 등
+    비전임 공고는 제외된다.
+    """
     soup = BeautifulSoup(html, "html.parser")
     results = []
     seen_urls = set()
@@ -277,13 +305,20 @@ def find_keyword_links_in_html(html: str, base_url: str, keyword: str, max_links
         if not text:
             continue
 
-        if keyword in text:
-            if href_abs not in seen_urls:
-                period = extract_period(a)
-                results.append((href_abs, period))
-                seen_urls.add(href_abs)
-                if len(results) >= max_links:
-                    break
+        if keyword not in text:
+            continue
+
+        # ★ 교수 임용(채용) 공고만 수집 (그 외 직군/광고성 링크 제외)
+        if not is_faculty_posting(text):
+            log(f"[SKIP] 교수 임용 공고 아님으로 제외: {text[:60]}")
+            continue
+
+        if href_abs not in seen_urls:
+            period = extract_period(a)
+            results.append((href_abs, period, text))
+            seen_urls.add(href_abs)
+            if len(results) >= max_links:
+                break
 
     return results
 
@@ -306,10 +341,13 @@ def build_email_body(matches: dict, ip: str | None = None):
         lines.append(f"■ 키워드: {kw} (모집기간: {period_info})")
 
         if link_periods:
-            for i, (u, _) in enumerate(link_periods, start=1):
-                lines.append(f"  - 관련 링크 {i}: {u}")
+            for i, (u, _period, title) in enumerate(link_periods, start=1):
+                if title:
+                    lines.append(f"  - 관련 링크 {i}: [{title}] {u}")
+                else:
+                    lines.append(f"  - 관련 링크 {i}: {u}")
         else:
-            lines.append("  - (키워드 주변 링크 없음)")
+            lines.append("  - (교수 임용 공고 링크 없음)")
         lines.append("")
 
     lines.append("-----")
@@ -347,29 +385,35 @@ def build_email_html(matches: dict, ip: str | None = None):
     cards = []
     for idx, (kw, link_periods) in enumerate(matches.items()):
         accent = accents[idx % len(accents)]
-        period_info = link_periods[0][1] if link_periods else "모집기간 정보 없음"
+        count = len(link_periods)
 
         link_rows = []
         if link_periods:
-            for i, (u, _) in enumerate(link_periods, start=1):
+            for i, (u, period, title) in enumerate(link_periods, start=1):
+                title_html = _esc(title) if title else "공고 바로가기"
+                period_html = (
+                    f'<span style="color:#64748b;font-size:12px;margin-left:32px;">🗓 {_esc(period)}</span>'
+                    if period and period != "(모집기간 정보 없음)" else ""
+                )
                 link_rows.append(
                     f'''
                     <tr>
-                      <td style="padding:6px 0;vertical-align:top;">
+                      <td style="padding:8px 0;vertical-align:top;">
                         <span style="display:inline-block;min-width:22px;height:22px;line-height:22px;text-align:center;
                                      background:{accent};color:#ffffff;border-radius:11px;font-size:12px;font-weight:700;
                                      margin-right:10px;">{i}</span>
                         <a href="{_esc(u)}" target="_blank"
-                           style="color:{accent};text-decoration:none;font-size:14px;word-break:break-all;font-weight:600;">
-                           공고 바로가기 →
+                           style="color:{accent};text-decoration:none;font-size:15px;word-break:break-word;font-weight:700;">
+                           {title_html} →
                         </a>
-                        <div style="color:#94a3b8;font-size:11px;margin:2px 0 0 32px;word-break:break-all;">{_esc(u)}</div>
+                        {period_html}
+                        <div style="color:#94a3b8;font-size:11px;margin:3px 0 0 32px;word-break:break-all;">{_esc(u)}</div>
                       </td>
                     </tr>'''
                 )
         else:
             link_rows.append(
-                '<tr><td style="padding:6px 0;color:#94a3b8;font-size:14px;">키워드 주변 링크 없음</td></tr>'
+                '<tr><td style="padding:6px 0;color:#94a3b8;font-size:14px;">교수 임용 공고 링크 없음</td></tr>'
             )
 
         cards.append(
@@ -384,7 +428,7 @@ def build_email_html(matches: dict, ip: str | None = None):
                       <td style="font-size:18px;font-weight:800;color:#0f172a;">🎓 {_esc(kw)}</td>
                       <td align="right" style="white-space:nowrap;">
                         <span style="display:inline-block;background:#f1f5f9;color:#475569;font-size:12px;font-weight:600;
-                                     padding:5px 12px;border-radius:20px;">🗓 {_esc(period_info)}</span>
+                                     padding:5px 12px;border-radius:20px;">교수 임용 공고 {count}건</span>
                       </td>
                     </tr>
                   </table>
@@ -411,10 +455,10 @@ def build_email_html(matches: dict, ip: str | None = None):
           <tr>
             <td style="background:linear-gradient(135deg,#1e3a8a 0%,#2563eb 100%);
                        border-radius:12px 12px 0 0;padding:28px 28px 24px 28px;">
-              <div style="color:#bfdbfe;font-size:13px;font-weight:600;letter-spacing:1px;">HIBRAIN · 임용 공지 알리미</div>
-              <div style="color:#ffffff;font-size:24px;font-weight:800;margin-top:6px;">지정 키워드 신규 감지 🔔</div>
+              <div style="color:#bfdbfe;font-size:13px;font-weight:600;letter-spacing:1px;">HIBRAIN · 교수 임용 알리미</div>
+              <div style="color:#ffffff;font-size:24px;font-weight:800;margin-top:6px;">교수 임용 공고 신규 감지 🔔</div>
               <div style="color:#dbeafe;font-size:14px;margin-top:8px;">
-                키워드 <b style="color:#ffffff;">{total_kw}</b>건 · 공고 링크 <b style="color:#ffffff;">{total_links}</b>건이 새로 감지되었습니다.
+                대학교 <b style="color:#ffffff;">{total_kw}</b>곳 · 교수 임용 공고 <b style="color:#ffffff;">{total_links}</b>건이 새로 감지되었습니다.
               </div>
             </td>
           </tr>
@@ -627,9 +671,9 @@ def main():
         if found:
             unique = []
             seen = set()
-            for url, period in found:
+            for url, period, title in found:
                 if url not in seen:
-                    unique.append((url, period))
+                    unique.append((url, period, title))
                     seen.add(url)
                     if len(unique) >= MAX_LINKS:
                         break

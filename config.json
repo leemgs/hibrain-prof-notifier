@@ -4,5 +4,7 @@
     "https://m.hibrain.net/recruitment/categories/ARAGP/categories/ARA01/recruits",
     "https://m.hibrain.net/recruitment/recruits?listType=RECOMM"
   ],
-  "max_links": 2
+  "max_links": 2,
+  "faculty_include_terms": ["교수", "교원", "초빙", "임용"],
+  "faculty_exclude_terms": ["Post-Doc", "Postdoc", "Post Doc", "포닥", "박사후", "시간강사"]
 }

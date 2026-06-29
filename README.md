@@ -10,6 +10,8 @@ GitHub Actions 또는 로컬 PC에서 실행할 수 있습니다.
 ## ✨ 기능 요약
 
 * 🔍 **키워드 기반 신규 임용 공지 자동 검색**
+* 🎓 **교수 임용(채용) 공고만 선별 수집** — 기업·연구원·Post-Doc·시간강사 등 비전임 공고는 자동 제외
+* 🏷 **공고 제목·모집기간을 이메일에 함께 표시**
 * 📡 **m.hibrain.net 모바일 페이지 기반 안정적 크롤링**
 * 🛡 **403 방지를 위한 브라우저 UA·헤더·세션 자동 설정**
 * 📅 **모집 기간 자동 추출**
@@ -103,9 +105,21 @@ python main.py
     "https://m.hibrain.net/recruitment/categories/ARAGP/categories/ARA01/recruits",
     "https://m.hibrain.net/recruitment/recruits?listType=RECOMM"
   ],
-  "max_links": 2
+  "max_links": 2,
+  "faculty_include_terms": ["교수", "교원", "초빙", "임용"],
+  "faculty_exclude_terms": ["Post-Doc", "Postdoc", "Post Doc", "포닥", "박사후", "시간강사"]
 }
 ```
+
+| 옵션 | 설명 |
+| --- | --- |
+| `browser_user_agent` | 403 완화를 위한 브라우저 User-Agent |
+| `web_addresses` | 크롤링 대상 Hibrain 모바일 목록 페이지 |
+| `max_links` | 키워드(대학)당 수집할 최대 공고 링크 수 |
+| `faculty_include_terms` | 공고 제목에 **하나 이상** 포함되어야 하는 교수 임용 신호어 |
+| `faculty_exclude_terms` | 제목에 포함되면 **제외**할 단어 (비전임/연구직 등) |
+
+> 🎓 **교수 임용 필터**: `recruits?listType=RECOMM` 페이지에는 대학 교수 공고뿐 아니라 기업·연구원 채용, Post-Doc, 시간강사 공고가 함께 노출됩니다. 위 두 옵션으로 **교수 임용(채용) 공고만** 걸러냅니다. (`faculty_include_terms` 중 하나 이상 포함 **AND** `faculty_exclude_terms`는 미포함)
 
 ---
 
@@ -157,26 +171,37 @@ Hibrain 모바일 페이지 구조에 맞춘 자동 파싱:
 
 키워드당 최대 N개의 링크만 추출 (`max_links` 옵션)
 
+### ● 4. 교수 임용(채용) 공고 선별 필터
+
+키워드(대학명)가 제목에 포함되더라도, 공고 제목이 **교수 임용 공고**일 때만 수집합니다.
+
+* `faculty_include_terms`(예: `교수`, `교원`, `초빙`, `임용`) 중 하나 이상 포함
+* **AND** `faculty_exclude_terms`(예: `Post-Doc`, `박사후`, `시간강사`)는 미포함
+
+이를 통해 추천 피드(`listType=RECOMM`)에 섞여 들어오는 기업 채용·연구원 채용·Post-Doc·시간강사 공고를 자동으로 걸러냅니다. 또한 수집한 **공고 제목**을 이메일 본문(HTML/평문)에 함께 표시하여 가독성을 높였습니다.
+
 ---
 
 ## 📧 이메일 예시
 
 이메일은 **HTML 카드 디자인**으로 발송되며, HTML을 지원하지 않는 클라이언트를 위해 아래와 같은 **평문(plain text) 폴백**이 함께 전송됩니다(`multipart/alternative`).
 
-* 상단 헤더: 감지된 키워드/링크 건수 요약
-* 키워드별 카드: 학교명 · 모집기간 배지 · 번호가 매겨진 공고 링크
+* 상단 헤더: 감지된 대학 수 / 교수 임용 공고 건수 요약
+* 대학별 카드: 학교명 · 공고 건수 배지 · **공고 제목(클릭 링크)** · 공고별 모집기간
 * 푸터: GitHub Actions 실행 IP · 저장소 주소
 
-평문 폴백 예시:
+평문 폴백 예시(공고 제목이 `[ ]` 안에 함께 표기됩니다):
 
 ```
 [Hibrain 임용 알리미] 지정 키워드 신규 감지 결과
 
 - 깃허브 액션 IP주소: 59.12.126.245
 
-■ 키워드: 아주대학교 (모집기간: 26.06.24~26.07.12)
-  - 관련 링크 1: https://m.hibrain.net/recruitment/...
-  - 관련 링크 2: https://m.hibrain.net/recruitment/...
+■ 키워드: 경희대학교 (모집기간: 26.06.29~26.07.09)
+  - 관련 링크 1: [경희대학교 서울캠퍼스 2026학년도 2학기 교수 초빙 (추가)] https://m.hibrain.net/recruitment/...
+
+■ 키워드: 성결대학교 (모집기간: 26.06.19~26.07.03)
+  - 관련 링크 1: [성결대학교 2026학년도 2학기 전임교원 초빙] https://m.hibrain.net/recruitment/...
 
 -----
 GitHub Repo Address:
