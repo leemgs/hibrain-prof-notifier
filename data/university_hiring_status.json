@@ -1,6 +1,6 @@
 {
-  "last_updated": "2026-06-27T12:58:21.887290+09:00",
-  "date_range": "2026-06-22 to 2026-06-26",
+  "last_updated": "2026-07-04T12:40:21.791837+09:00",
+  "date_range": "2026-06-29 to 2026-07-03",
   "total_universities": 6,
   "status_list": [
     {
@@ -8,50 +8,50 @@
       "period": "26.06.29~26.07.09",
       "links": [
         "https://m.hibrain.net/recruitment/categories/ARAGP/categories/ARA01/recruits/3587287?pagekey=3587287&listType=ING&pagesize=5&sortType=SORTDTM&cntType=ARAGP&limit=25&displayType=TIT&siteid=1&page=1",
-        "https://m.hibrain.net/recruitment/categories/ARAGP/categories/ARA01/recruits/3587387?pagekey=3587387&listType=ING&pagesize=5&sortType=SORTDTM&cntType=ARAGP&limit=25&displayType=TIT&siteid=1&page=1"
+        "https://m.hibrain.net/recruitment/categories/ARAGP/categories/ARA01/recruits/3588237?pagekey=3588237&listType=ING&pagesize=5&sortType=SORTDTM&cntType=ARAGP&limit=25&displayType=TIT&siteid=1&page=1"
       ],
-      "detected_at": "2026-06-26T11:26:42+09:00"
+      "detected_at": "2026-07-03T09:12:03+09:00"
     },
     {
       "university": "명지대학교",
-      "period": "26.06.24~26.07.01",
+      "period": "26.06.24~오늘마감",
       "links": [
         "https://m.hibrain.net/recruitment/recruits/3586285?pagekey=3586285&listType=RECOMM&pagesize=5&sortType=AD&limit=25&displayType=TIT&siteid=1&page=1"
       ],
-      "detected_at": "2026-06-26T11:26:42+09:00"
+      "detected_at": "2026-07-01T09:13:23+09:00"
     },
     {
       "university": "성결대학교",
-      "period": "26.06.19~26.07.03",
+      "period": "26.06.19~오늘마감",
       "links": [
         "https://m.hibrain.net/recruitment/recruits/3586551?pagekey=3586551&listType=RECOMM&pagesize=5&sortType=AD&limit=25&displayType=TIT&siteid=1&page=1"
       ],
-      "detected_at": "2026-06-26T11:26:42+09:00"
+      "detected_at": "2026-07-03T09:12:03+09:00"
     },
     {
       "university": "수원대학교",
-      "period": "26.06.22~26.06.29",
+      "period": "26.07.01~26.07.08",
       "links": [
-        "https://m.hibrain.net/recruitment/recruits/3585626?pagekey=3585626&listType=RECOMM&pagesize=5&sortType=AD&limit=25&displayType=TIT&siteid=1&page=1"
+        "https://m.hibrain.net/recruitment/categories/ARAGP/categories/ARA01/recruits/3587944?pagekey=3587944&listType=ING&pagesize=5&sortType=SORTDTM&cntType=ARAGP&limit=25&displayType=TIT&siteid=1&page=1"
       ],
-      "detected_at": "2026-06-26T11:26:42+09:00"
+      "detected_at": "2026-07-01T09:13:23+09:00"
     },
     {
       "university": "아주대학교",
-      "period": "26.06.25~26.07.22",
+      "period": "26.06.25~26.07.06",
       "links": [
-        "https://m.hibrain.net/recruitment/categories/ARAGP/categories/ARA01/recruits/3587255?pagekey=3587255&listType=ING&pagesize=5&sortType=SORTDTM&cntType=ARAGP&limit=25&displayType=TIT&siteid=1&page=1",
-        "https://m.hibrain.net/recruitment/recruits/3584332?pagekey=3584332&listType=RECOMM&pagesize=5&sortType=AD&limit=25&displayType=TIT&siteid=1&page=1"
+        "https://m.hibrain.net/recruitment/categories/ARAGP/categories/ARA01/recruits/3587297?pagekey=3587297&listType=ING&pagesize=5&sortType=SORTDTM&cntType=ARAGP&limit=25&displayType=TIT&siteid=1&page=1",
+        "https://m.hibrain.net/recruitment/recruits/3587297?pagekey=3587297&listType=RECOMM&pagesize=5&sortType=AD&limit=25&displayType=TIT&siteid=1&page=1"
       ],
-      "detected_at": "2026-06-26T11:26:42+09:00"
+      "detected_at": "2026-07-03T09:12:03+09:00"
     },
     {
-      "university": "한신대학교",
-      "period": "26.06.15~오늘마감",
+      "university": "용인대학교",
+      "period": "26.06.25~26.07.01",
       "links": [
-        "https://m.hibrain.net/recruitment/recruits/3584386?pagekey=3584386&listType=RECOMM&pagesize=5&sortType=AD&limit=25&displayType=TIT&siteid=1&page=1"
+        "https://m.hibrain.net/recruitment/categories/ARAGP/categories/ARA01/recruits/3587537?pagekey=3587537&listType=ING&pagesize=5&sortType=SORTDTM&cntType=ARAGP&limit=25&displayType=TIT&siteid=1&page=1"
       ],
-      "detected_at": "2026-06-22T09:17:26+09:00"
+      "detected_at": "2026-06-29T09:13:32+09:00"
     }
   ]
 }
