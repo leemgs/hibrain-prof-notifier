@@ -7,6 +7,87 @@ GitHub Actions 또는 로컬 PC에서 실행할 수 있습니다.
 
 ---
 
+## 👀 한눈에 보기
+
+키워드(대학) 목록을 기준으로 **Hibrain 모바일 페이지를 크롤링 → 교수 임용 공고만 선별 → 이메일·GitHub Issue 발송 → 주간 현황 집계**까지 자동으로 처리하는 파이프라인입니다.
+
+```mermaid
+flowchart LR
+    subgraph SRC["🌐 데이터 소스"]
+        HB["Hibrain 모바일<br/>(m.hibrain.net)"]
+    end
+
+    subgraph CFG["⚙️ 입력 설정"]
+        KW["keywords.txt<br/>(대학 키워드)"]
+        CF["config.json<br/>(UA·URL·필터)"]
+        EM["data/email.json<br/>(SMTP·수신인)"]
+    end
+
+    subgraph PIPE["hibrain-prof-notifier"]
+        direction LR
+        M["📡 main.py<br/><b>수집·선별·발송</b>"]
+        W["📊 weekly_summary.py<br/><b>주간 집계</b>"]
+    end
+
+    subgraph OUT["📤 출력"]
+        MAIL["📧 HTML 이메일"]
+        ISS["🐙 GitHub Issue"]
+        JSON["🗂️ university_hiring_status.json"]
+    end
+
+    SRC --> M
+    CFG --> M
+    M -->|알림 발송| MAIL
+    M -->|결과 기록| ISS
+    ISS -->|주간 파싱| W
+    W -->|현황 커밋| JSON
+```
+
+| 컴포넌트 | 역할 | 한 줄 설명 |
+| --- | --- | --- |
+| `main.py` | 📡 **수집·선별·발송** | Hibrain 모바일 페이지를 크롤링해 교수 임용 공고만 선별하고 이메일·Issue로 발송 |
+| `weekly_summary.py` | 📊 **주간 집계** | GitHub Issue에 쌓인 알림을 파싱해 대학별 주간 채용 현황 JSON을 갱신 |
+| `config.json` / `keywords.txt` | ⚙️ **입력 설정** | 크롤링 대상·필터·대학 키워드 정의 |
+| `.github/workflows/` | ⚡ **자동 실행** | 일일 알림·주간 요약 워크플로우 스케줄링 |
+
+---
+
+## 🔄 동작 흐름 (Operation Flow)
+
+신규 공고를 감지해 알림을 보내고, 그 결과를 주간 현황으로 집계하기까지의 전체 흐름입니다.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant HB as 🌐 Hibrain 모바일
+    participant M as 📡 main.py
+    participant MAIL as 📧 이메일(수신인)
+    participant GI as 🐙 GitHub Issue
+    participant W as 📊 weekly_summary.py
+    participant JSON as 🗂️ 현황 JSON
+
+    Note over M: 매일 KST 08:00 (cron)
+    M->>HB: 목록 페이지 크롤링 (키워드별)
+    HB-->>M: 공고 제목·링크·모집기간
+    M->>M: 교수 임용 공고 선별<br/>(include AND NOT exclude)
+    M->>M: 채용 고유번호 기준 중복 제거
+    alt 신규 공고 있음
+        M->>MAIL: HTML 카드 + 평문 폴백 발송
+        M->>GI: 감지 결과 Issue 생성
+    else 신규 공고 없음
+        M-->>M: 발송 생략
+    end
+
+    Note over W: 매주 토요일 KST 09:00 (cron)
+    GI->>W: 월~금 알림 Issue 수집·파싱
+    W->>W: 대학별 최신 정보로 중복 필터링
+    W->>JSON: 주간 현황 갱신 후 자동 커밋·푸시
+```
+
+> 핵심 원칙: _수집·선별·발송은 자동, 최종 알림 대상은 키워드·필터 설정으로 사람이 제어._
+
+---
+
 ## ✨ 기능 요약
 
 * 🔍 **키워드 기반 신규 임용 공지 자동 검색**
