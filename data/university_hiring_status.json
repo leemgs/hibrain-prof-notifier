@@ -1,32 +1,39 @@
 {
-  "last_updated": "2026-07-11T12:17:41.993282+09:00",
-  "date_range": "2026-07-06 to 2026-07-10",
-  "total_universities": 3,
+  "last_updated": "2026-07-18T11:54:06.976435+09:00",
+  "date_range": "2026-07-13 to 2026-07-17",
+  "total_universities": 4,
   "status_list": [
     {
       "university": "강남대학교",
-      "period": "26.07.09~26.07.15",
+      "period": "26.07.09~오늘마감",
       "links": [
-        "https://m.hibrain.net/recruitment/categories/ARAGP/categories/ARA01/recruits/3589528?pagekey=3589528&listType=ING&pagesize=5&sortType=SORTDTM&cntType=ARAGP&limit=25&displayType=TIT&siteid=1&page=1"
+        "https://m.hibrain.net/recruitment/recruits/3589528?pagekey=3589528&listType=RECOMM&pagesize=5&sortType=AD&limit=25&displayType=TIT&siteid=1&page=1"
       ],
-      "detected_at": "2026-07-10T09:10:42+09:00"
+      "detected_at": "2026-07-15T08:56:46+09:00"
     },
     {
       "university": "경희대학교",
-      "period": "26.07.07~26.07.14",
+      "period": "26.07.15~26.07.19",
       "links": [
-        "https://m.hibrain.net/recruitment/categories/ARAGP/categories/ARA01/recruits/3589183?pagekey=3589183&listType=ING&pagesize=5&sortType=SORTDTM&cntType=ARAGP&limit=25&displayType=TIT&siteid=1&page=1",
-        "https://m.hibrain.net/recruitment/categories/ARAGP/categories/ARA01/recruits/3589188?pagekey=3589188&listType=ING&pagesize=5&sortType=SORTDTM&cntType=ARAGP&limit=25&displayType=TIT&siteid=1&page=1"
+        "https://m.hibrain.net/recruitment/categories/ARAGP/categories/ARA01/recruits/3590338?pagekey=3590338&listType=ING&pagesize=5&sortType=SORTDTM&cntType=ARAGP&limit=25&displayType=TIT&siteid=1&page=1"
       ],
-      "detected_at": "2026-07-09T09:16:53+09:00"
+      "detected_at": "2026-07-16T09:03:18+09:00"
     },
     {
       "university": "아주대학교",
-      "period": "26.06.25~오늘마감",
+      "period": "26.07.16~26.07.22",
       "links": [
-        "https://m.hibrain.net/recruitment/recruits/3587297?pagekey=3587297&listType=RECOMM&pagesize=5&sortType=AD&limit=25&displayType=TIT&siteid=1&page=1"
+        "https://m.hibrain.net/recruitment/categories/ARAGP/categories/ARA01/recruits/3590599?pagekey=3590599&listType=ING&pagesize=5&sortType=SORTDTM&cntType=ARAGP&limit=25&displayType=TIT&siteid=1&page=1"
       ],
-      "detected_at": "2026-07-06T09:12:39+09:00"
+      "detected_at": "2026-07-17T09:02:32+09:00"
+    },
+    {
+      "university": "한신대학교",
+      "period": "26.07.16~26.07.21",
+      "links": [
+        "https://m.hibrain.net/recruitment/categories/ARAGP/categories/ARA01/recruits/3590572?pagekey=3590572&listType=ING&pagesize=5&sortType=SORTDTM&cntType=ARAGP&limit=25&displayType=TIT&siteid=1&page=1"
+      ],
+      "detected_at": "2026-07-17T09:02:32+09:00"
     }
   ]
 }
