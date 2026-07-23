@@ -573,20 +573,29 @@ def send_email(subject: str, body: str, html_body: str | None = None):
 
     log(f"[INFO] 이메일 발송 시도... Host: {smtp_host}, Port: {smtp_port}, User: {smtp_user}, To: {to_addrs}")
 
-    if smtp_port == 465:
-        # SSL 발송
-        with smtplib.SMTP_SSL(smtp_host, smtp_port, timeout=20) as smtp:
-            smtp.login(smtp_user, smtp_pass)
-            smtp.send_message(msg)
-    else:
-        # STARTTLS 발송 (예: 587)
-        import ssl
-        ctx = ssl.create_default_context()
-        with smtplib.SMTP(smtp_host, smtp_port, timeout=20) as smtp:
-            smtp.ehlo()
-            smtp.starttls(context=ctx)
-            smtp.login(smtp_user, smtp_pass)
-            smtp.sendmail(sender, to_addrs, msg.as_string())
+    try:
+        if smtp_port == 465:
+            with smtplib.SMTP_SSL(smtp_host, smtp_port, timeout=20) as smtp:
+                smtp.login(smtp_user, smtp_pass)
+                smtp.send_message(msg)
+        else:
+            import ssl
+            ctx = ssl.create_default_context()
+            with smtplib.SMTP(smtp_host, smtp_port, timeout=20) as smtp:
+                smtp.ehlo()
+                smtp.starttls(context=ctx)
+                smtp.login(smtp_user, smtp_pass)
+                smtp.sendmail(sender, to_addrs, msg.as_string())
+    except smtplib.SMTPAuthenticationError:
+        log(
+            "[ERROR] SMTP 인증 실패 (535 Bad Credentials)\n"
+            "  Gmail은 일반 비밀번호로 SMTP 직접 접근을 허용하지 않습니다.\n"
+            "  해결 방법:\n"
+            "  1. Google 계정에서 2단계 인증(2FA) 활성화\n"
+            "  2. https://myaccount.google.com/apppasswords 에서 앱 비밀번호(16자리) 생성\n"
+            "  3. 생성된 앱 비밀번호를 GitHub Secret 'SMTP_PASS' 값으로 업데이트"
+        )
+        raise
 
     log("이메일 발송 완료")
 
@@ -708,10 +717,18 @@ def main():
     log("=======================")
 
     # 이메일 발송 (HTML + 평문 멀티파트)
-    send_email(subject, body, html_body=html_body)
+    email_error = None
+    try:
+        send_email(subject, body, html_body=html_body)
+    except Exception as e:
+        log(f"[ERROR] 이메일 발송 실패: {e}")
+        email_error = e
 
-    # GitHub Issue 생성
+    # GitHub Issue 생성 (이메일 발송 성공 여부와 관계없이 항상 시도)
     create_github_issue(subject, body)
+
+    if email_error:
+        raise SystemExit(1)
 
 if __name__ == "__main__":
     main()

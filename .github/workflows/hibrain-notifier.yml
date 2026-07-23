@@ -32,6 +32,7 @@ jobs:
 
       - name: Run notifier
         env:
+          GMAIL_USER: ${{ secrets.GMAIL_USER }}
           SMTP_PASS: ${{ secrets.SMTP_PASS }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
