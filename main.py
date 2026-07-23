@@ -508,6 +508,118 @@ def build_email_html(matches: dict, ip: str | None = None):
     return html
 
 # ---------------------------------------------------------
+# SMTP 사전 연결 테스트
+# ---------------------------------------------------------
+
+def smtp_connection_test() -> bool:
+    """SMTP 서버 연결 및 인증을 사전 검증한다.
+
+    main() 시작 시 호출되어 GitHub Actions 로그에서 인증 상태를
+    빠르게 확인할 수 있도록 단계별 결과를 출력한다.
+    테스트 실패 시에도 메인 로직은 계속 진행된다.
+    """
+    SEP = "=" * 55
+    log(SEP)
+    log("[SMTP 연결 테스트] 시작")
+
+    # email.json 에서 기본값 로드
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    email_json_path = os.path.join(base_dir, "data", "email.json")
+
+    smtp_host = "smtp.gmail.com"
+    smtp_port = 465
+    smtp_user = None
+
+    if os.path.exists(email_json_path):
+        try:
+            with open(email_json_path, "r", encoding="utf-8") as f:
+                cfg = json.load(f)
+                smtp_host = cfg.get("smtp_host", smtp_host)
+                smtp_port = int(cfg.get("smtp_port", smtp_port))
+                smtp_user = cfg.get("smtp_user")
+        except Exception as e:
+            log(f"[SMTP 연결 테스트] email.json 파싱 실패: {e}")
+
+    # 환경변수 오버라이드
+    env_user = os.environ.get("GMAIL_USER")
+    smtp_pass = os.environ.get("SMTP_PASS") or os.environ.get("GMAIL_APP_PASSWORD")
+    if env_user:
+        smtp_user = env_user
+
+    # ── 설정 출력 ──────────────────────────────────────────
+    log(f"[SMTP 연결 테스트] Host : {smtp_host}")
+    log(f"[SMTP 연결 테스트] Port : {smtp_port}")
+    log(f"[SMTP 연결 테스트] User : {smtp_user or '(미설정)'}")
+
+    if smtp_pass:
+        masked = smtp_pass[:4] + "*" * (len(smtp_pass) - 4)
+        log(f"[SMTP 연결 테스트] Pass : {masked} (길이: {len(smtp_pass)}자)")
+        if len(smtp_pass) == 16:
+            log("[SMTP 연결 테스트] 비밀번호 길이 16자 → Gmail 앱 비밀번호 형식 정상")
+        else:
+            log(
+                f"[SMTP 연결 테스트] 경고: 비밀번호 길이 {len(smtp_pass)}자"
+                " → Gmail 앱 비밀번호는 16자여야 합니다"
+            )
+    else:
+        log("[SMTP 연결 테스트] Pass : (미설정 — SMTP_PASS 환경변수 없음)")
+
+    # ── 필수값 누락 조기 종료 ──────────────────────────────
+    if not smtp_pass or not smtp_user:
+        log("[SMTP 연결 테스트] FAIL — 필수 설정(계정/비밀번호) 누락")
+        log(SEP)
+        return False
+
+    # ── 실제 연결 및 인증 테스트 ──────────────────────────
+    try:
+        if smtp_port == 465:
+            log(f"[SMTP 연결 테스트] {smtp_host}:{smtp_port} SSL 연결 시도...")
+            with smtplib.SMTP_SSL(smtp_host, smtp_port, timeout=15) as smtp:
+                log("[SMTP 연결 테스트] SSL 연결 성공")
+                code, _ = smtp.ehlo()
+                log(f"[SMTP 연결 테스트] EHLO 응답 코드: {code}")
+                log(f"[SMTP 연결 테스트] 로그인(인증) 시도: {smtp_user}")
+                smtp.login(smtp_user, smtp_pass)
+                log("[SMTP 연결 테스트] OK — 인증 성공 ✓")
+        else:
+            import ssl as _ssl
+            ctx = _ssl.create_default_context()
+            log(f"[SMTP 연결 테스트] {smtp_host}:{smtp_port} STARTTLS 연결 시도...")
+            with smtplib.SMTP(smtp_host, smtp_port, timeout=15) as smtp:
+                smtp.ehlo()
+                log("[SMTP 연결 테스트] TCP 연결 성공")
+                smtp.starttls(context=ctx)
+                log("[SMTP 연결 테스트] STARTTLS 협상 성공")
+                log(f"[SMTP 연결 테스트] 로그인(인증) 시도: {smtp_user}")
+                smtp.login(smtp_user, smtp_pass)
+                log("[SMTP 연결 테스트] OK — 인증 성공 ✓")
+
+        log(SEP)
+        return True
+
+    except smtplib.SMTPAuthenticationError as e:
+        log(f"[SMTP 연결 테스트] FAIL — 인증 거부 (코드: {e.smtp_code}): {e.smtp_error}")
+        log(
+            "  Gmail은 일반 비밀번호로 SMTP 직접 접근을 허용하지 않습니다.\n"
+            "  해결 방법:\n"
+            "  1. Google 계정에서 2단계 인증(2FA) 활성화\n"
+            "  2. https://myaccount.google.com/apppasswords 에서 앱 비밀번호(16자리) 생성\n"
+            "  3. 생성된 앱 비밀번호를 GitHub Secret 'SMTP_PASS' 값으로 업데이트"
+        )
+    except smtplib.SMTPConnectError as e:
+        log(f"[SMTP 연결 테스트] FAIL — 서버 연결 실패: {e}")
+    except smtplib.SMTPException as e:
+        log(f"[SMTP 연결 테스트] FAIL — SMTP 오류: {type(e).__name__}: {e}")
+    except OSError as e:
+        log(f"[SMTP 연결 테스트] FAIL — 네트워크 오류: {e}")
+    except Exception as e:
+        log(f"[SMTP 연결 테스트] FAIL — 예외 발생: {type(e).__name__}: {e}")
+
+    log(SEP)
+    return False
+
+
+# ---------------------------------------------------------
 # 이메일 발송
 # ---------------------------------------------------------
 
@@ -643,6 +755,8 @@ def create_github_issue(title: str, body: str):
 # ---------------------------------------------------------
 
 def main():
+    smtp_connection_test()
+
     keywords = load_keywords()
     log(f"로드된 키워드: {keywords}")
 
