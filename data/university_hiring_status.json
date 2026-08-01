@@ -1,15 +1,47 @@
 {
-  "last_updated": "2026-07-25T12:17:03.566406+09:00",
-  "date_range": "2026-07-20 to 2026-07-24",
-  "total_universities": 1,
+  "last_updated": "2026-08-01T12:29:14.978584+09:00",
+  "date_range": "2026-07-27 to 2026-07-31",
+  "total_universities": 5,
   "status_list": [
+    {
+      "university": "강남대학교",
+      "period": "26.07.30~26.08.10",
+      "links": [
+        "https://m.hibrain.net/recruitment/categories/ARAGP/categories/ARA01/recruits/3592333?pagekey=3592333&listType=ING&pagesize=5&sortType=SORTDTM&cntType=ARAGP&limit=25&displayType=TIT&siteid=1&page=1"
+      ],
+      "detected_at": "2026-07-31T09:07:13+09:00"
+    },
+    {
+      "university": "경기대학교",
+      "period": "26.08.03~26.08.12",
+      "links": [
+        "https://m.hibrain.net/recruitment/categories/ARAGP/categories/ARA01/recruits/3592111?pagekey=3592111&listType=ING&pagesize=5&sortType=SORTDTM&cntType=ARAGP&limit=25&displayType=TIT&siteid=1&page=1"
+      ],
+      "detected_at": "2026-07-30T09:04:21+09:00"
+    },
+    {
+      "university": "경희대학교",
+      "period": "26.07.24~26.08.03",
+      "links": [
+        "https://m.hibrain.net/recruitment/categories/ARAGP/categories/ARA01/recruits/3591959?pagekey=3591959&listType=ING&pagesize=5&sortType=SORTDTM&cntType=ARAGP&limit=25&displayType=TIT&siteid=1&page=1"
+      ],
+      "detected_at": "2026-07-29T09:02:13+09:00"
+    },
+    {
+      "university": "아주대학교",
+      "period": "26.07.28~26.08.18",
+      "links": [
+        "https://m.hibrain.net/recruitment/recruits/3591687?pagekey=3591687&listType=RECOMM&pagesize=5&sortType=AD&limit=25&displayType=TIT&siteid=1&page=1"
+      ],
+      "detected_at": "2026-07-31T09:07:13+09:00"
+    },
     {
       "university": "협성대학교",
       "period": "26.08.03~26.08.05",
       "links": [
         "https://m.hibrain.net/recruitment/recruits/3591101?pagekey=3591101&listType=RECOMM&pagesize=5&sortType=AD&limit=25&displayType=TIT&siteid=1&page=1"
       ],
-      "detected_at": "2026-07-24T09:05:19+09:00"
+      "detected_at": "2026-07-31T09:07:13+09:00"
     }
   ]
 }
