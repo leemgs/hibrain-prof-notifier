@@ -542,7 +542,7 @@ def smtp_connection_test() -> bool:
 
     # 환경변수 오버라이드
     env_user = os.environ.get("GMAIL_USER")
-    smtp_pass = os.environ.get("SMTP_PASS") or os.environ.get("GMAIL_APP_PASSWORD")
+    smtp_pass = os.environ.get("GMAIL_APP_PASSWORD") or os.environ.get("SMTP_PASS")
     if env_user:
         smtp_user = env_user
 
@@ -562,7 +562,7 @@ def smtp_connection_test() -> bool:
                 " → Gmail 앱 비밀번호는 16자여야 합니다"
             )
     else:
-        log("[SMTP 연결 테스트] Pass : (미설정 — SMTP_PASS 환경변수 없음)")
+        log("[SMTP 연결 테스트] Pass : (미설정 — GMAIL_APP_PASSWORD 환경변수 없음)")
 
     # ── 필수값 누락 조기 종료 ──────────────────────────────
     if not smtp_pass or not smtp_user:
@@ -604,7 +604,7 @@ def smtp_connection_test() -> bool:
             "  해결 방법:\n"
             "  1. Google 계정에서 2단계 인증(2FA) 활성화\n"
             "  2. https://myaccount.google.com/apppasswords 에서 앱 비밀번호(16자리) 생성\n"
-            "  3. 생성된 앱 비밀번호를 GitHub Secret 'SMTP_PASS' 값으로 업데이트"
+            "  3. 생성된 앱 비밀번호를 GitHub Secret 'GMAIL_APP_PASSWORD' 값으로 업데이트"
         )
     except smtplib.SMTPConnectError as e:
         log(f"[SMTP 연결 테스트] FAIL — 서버 연결 실패: {e}")
@@ -654,7 +654,7 @@ def send_email(subject: str, body: str, html_body: str | None = None):
     # 2. 환경변수 오버라이드 및 폴백 지원
     env_smtp_user = os.environ.get("GMAIL_USER")
     env_target_email = os.environ.get("TARGET_EMAIL")
-    smtp_pass = os.environ.get("SMTP_PASS") or os.environ.get("GMAIL_APP_PASSWORD")
+    smtp_pass = os.environ.get("GMAIL_APP_PASSWORD") or os.environ.get("SMTP_PASS")
     
     if env_smtp_user:
         smtp_user = env_smtp_user
@@ -664,7 +664,7 @@ def send_email(subject: str, body: str, html_body: str | None = None):
 
     # 유효성 검증
     if not smtp_pass:
-        raise RuntimeError("SMTP_PASS (또는 GMAIL_APP_PASSWORD) 환경변수를 설정해야 합니다.")
+        raise RuntimeError("GMAIL_APP_PASSWORD (또는 하위 호환용 SMTP_PASS) 환경변수를 설정해야 합니다.")
     if not smtp_user:
         raise RuntimeError("SMTP 사용자 계정(smtp_user)이 지정되지 않았습니다.")
     if not receivers:
@@ -705,7 +705,7 @@ def send_email(subject: str, body: str, html_body: str | None = None):
             "  해결 방법:\n"
             "  1. Google 계정에서 2단계 인증(2FA) 활성화\n"
             "  2. https://myaccount.google.com/apppasswords 에서 앱 비밀번호(16자리) 생성\n"
-            "  3. 생성된 앱 비밀번호를 GitHub Secret 'SMTP_PASS' 값으로 업데이트"
+            "  3. 생성된 앱 비밀번호를 GitHub Secret 'GMAIL_APP_PASSWORD' 값으로 업데이트"
         )
         raise
 

@@ -142,7 +142,7 @@ pip install -r requirements.txt
 
 ### 3) 이메일 설정 및 환경 변수 설정
 
-이메일 발송 계정 및 수신인 등의 설정은 `./data/email.json` 파일에서 관리합니다. 보안을 필요로 하는 SMTP 비밀번호(`SMTP_PASS`)만 환경변수 또는 GitHub Secrets로 주입합니다.
+이메일 발송 계정 및 수신인 등의 설정은 `./data/email.json` 파일에서 관리합니다. 보안을 필요로 하는 SMTP 비밀번호(`GMAIL_APP_PASSWORD`)만 환경변수 또는 GitHub Secrets로 주입합니다.
 
 #### 1. `./data/email.json` 파일 설정
 기본 템플릿 파일이 제공되며, 상황에 맞게 편집하여 사용합니다. 수신인(`receivers`)은 배열 형식으로 여러 명을 지정할 수 있습니다.
@@ -161,10 +161,10 @@ pip install -r requirements.txt
 ```
 
 #### 2. 환경 변수 설정
-이메일 비밀번호(앱 비밀번호)만 환경 변수로 지정합니다. (하위 호환성을 위해 `GMAIL_APP_PASSWORD`도 지원합니다.)
+이메일 비밀번호(앱 비밀번호)만 환경 변수로 지정합니다. (하위 호환성을 위해 기존 `SMTP_PASS`도 계속 지원합니다.)
 
 ```bash
-export SMTP_PASS="your_google_app_password"
+export GMAIL_APP_PASSWORD="your_google_app_password"
 ```
 
 > ❗ Gmail을 사용하는 경우, 2단계 인증 활성화 후 생성한 **앱 비밀번호**를 입력해야 합니다.
@@ -326,11 +326,11 @@ jobs:
       - run: pip install -r requirements.txt
       - run: python main.py
         env:
-          SMTP_PASS: ${{ secrets.SMTP_PASS }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 ```
 
-> ⚠️ 필요한 시크릿: `SMTP_PASS`(Gmail 앱 비밀번호). `GITHUB_TOKEN`은 Actions가 자동 제공합니다.
+> ⚠️ 필요한 시크릿: `GMAIL_APP_PASSWORD`(Gmail 앱 비밀번호). `GITHUB_TOKEN`은 Actions가 자동 제공합니다.
 
 ### 2) 주간 요약 — `.github/workflows/weekly-summary.yml`
 
