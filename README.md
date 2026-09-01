@@ -99,6 +99,7 @@ sequenceDiagram
   예: `25.12.01~내일마감`
 * 📧 **이메일 자동 발송(Gmail SMTP)** — 가독성 높은 **HTML 카드 디자인** + 평문(plain text) 폴백을 함께 전송
 * 🐙 **GitHub Issue 자동 생성** — 감지 결과를 Issue로도 기록 (주간 요약의 데이터 소스)
+* 🚨 **이메일 전송 실패 시 자동 Issue 등록** — `GMAIL_APP_PASSWORD`(Gmail SMTP 앱 비밀번호)로 이메일 발송이 실패하면 오류 유형·메시지·SMTP 설정·앱 비밀번호 설정 여부·실행 로그를 담은 진단 Issue를 자동으로 생성 (비밀번호 값 자체는 노출하지 않음)
 * ⚡ **GitHub Actions 스케줄링 지원**
 * 📊 **주간 채용 현황 자동 집계 및 커밋** (저장소 Activity 유지)
 

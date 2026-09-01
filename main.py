@@ -750,6 +750,81 @@ def create_github_issue(title: str, body: str):
     else:
         log(f"[WARN] GitHub Issue 생성 실패: status={resp.status_code}, body={resp.text}")
 
+
+def build_email_failure_issue(error: Exception) -> tuple[str, str]:
+    """
+    GMAIL_APP_PASSWORD(SMTP 앱 비밀번호)로 이메일 전송이 실패했을 때,
+    GitHub Issue로 등록할 제목/본문을 구성한다.
+    비밀번호 값 자체는 절대 노출하지 않고, 설정 여부/길이 등 진단 정보만 남긴다.
+    """
+    from datetime import datetime, timezone, timedelta
+
+    kst = timezone(timedelta(hours=9))
+    now_kst = datetime.now(kst).strftime("%Y-%m-%d %H:%M:%S KST")
+
+    # ── SMTP 설정값 수집 (값 자체는 노출하지 않음) ──────────
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    email_json_path = os.path.join(base_dir, "data", "email.json")
+    smtp_host = "smtp.gmail.com"
+    smtp_port = 465
+    smtp_user = None
+    if os.path.exists(email_json_path):
+        try:
+            with open(email_json_path, "r", encoding="utf-8") as f:
+                email_cfg = json.load(f)
+                smtp_host = email_cfg.get("smtp_host", smtp_host)
+                smtp_port = email_cfg.get("smtp_port", smtp_port)
+                smtp_user = email_cfg.get("smtp_user")
+        except Exception:
+            pass
+    smtp_user = os.environ.get("GMAIL_USER") or smtp_user
+
+    # ── 비밀번호 시크릿 설정 여부 진단 ─────────────────────
+    app_pw = os.environ.get("GMAIL_APP_PASSWORD")
+    legacy_pw = os.environ.get("SMTP_PASS")
+    if app_pw:
+        pw_status = f"GMAIL_APP_PASSWORD 설정됨 (길이 {len(app_pw)}자)"
+        if len(app_pw) != 16:
+            pw_status += " — ⚠️ Gmail 앱 비밀번호는 16자여야 합니다"
+    elif legacy_pw:
+        pw_status = f"SMTP_PASS(하위호환) 설정됨 (길이 {len(legacy_pw)}자)"
+        if len(legacy_pw) != 16:
+            pw_status += " — ⚠️ Gmail 앱 비밀번호는 16자여야 합니다"
+    else:
+        pw_status = "❌ 미설정 (GMAIL_APP_PASSWORD / SMTP_PASS 모두 없음)"
+
+    auth_hint = ""
+    if isinstance(error, smtplib.SMTPAuthenticationError):
+        auth_hint = (
+            "\n### 인증 실패(535) 해결 방법\n"
+            "1. Google 계정에서 2단계 인증(2FA) 활성화\n"
+            "2. https://myaccount.google.com/apppasswords 에서 앱 비밀번호(16자리) 생성\n"
+            "3. 생성된 앱 비밀번호를 GitHub Secret `GMAIL_APP_PASSWORD` 값으로 업데이트\n"
+        )
+
+    logs = "\n".join(LOG_MESSAGES) if LOG_MESSAGES else "(로그 없음)"
+
+    subject = "[Hibrain] 이메일 전송 실패 — SMTP 발송 오류 자동 보고"
+    body = (
+        "GMAIL_APP_PASSWORD(Gmail SMTP 앱 비밀번호)를 이용한 이메일 전송이 실패하여 "
+        "자동으로 등록된 이슈입니다.\n\n"
+        "### 실패 요약\n"
+        f"- 발생 시각: {now_kst}\n"
+        f"- 오류 유형: `{type(error).__name__}`\n"
+        f"- 오류 메시지: {error}\n\n"
+        "### SMTP 설정\n"
+        f"- SMTP Host: {smtp_host}\n"
+        f"- SMTP Port: {smtp_port}\n"
+        f"- SMTP User: {smtp_user or '(미설정)'}\n"
+        f"- 앱 비밀번호 시크릿: {pw_status}\n"
+        f"{auth_hint}"
+        "\n### 실행 로그\n"
+        "```\n"
+        f"{logs}\n"
+        "```\n"
+    )
+    return subject, body
+
 # ---------------------------------------------------------
 # 메인 로직
 # ---------------------------------------------------------
@@ -788,8 +863,17 @@ def main():
             )
 
             log("=== IP 차단 에러 발생: 이메일/Issue 전송 ===")
-            send_email(subject, body)
+            email_error = None
+            try:
+                send_email(subject, body)
+            except Exception as e:
+                log(f"[ERROR] 이메일 발송 실패: {e}")
+                email_error = e
             create_github_issue(subject, body)
+            if email_error:
+                log("=== 이메일 전송 실패: 실패 정보 GitHub Issue 등록 ===")
+                fail_subject, fail_body = build_email_failure_issue(email_error)
+                create_github_issue(fail_subject, fail_body)
         else:
             log("[WARN] 어떤 URL에서도 HTML을 가져오지 못했습니다. 이메일/Issue 발송 없음.")
         return
@@ -842,6 +926,10 @@ def main():
     create_github_issue(subject, body)
 
     if email_error:
+        # 이메일 전송 실패 → 실패 상세 정보를 별도 GitHub Issue로 등록
+        log("=== 이메일 전송 실패: 실패 정보 GitHub Issue 등록 ===")
+        fail_subject, fail_body = build_email_failure_issue(email_error)
+        create_github_issue(fail_subject, fail_body)
         raise SystemExit(1)
 
 if __name__ == "__main__":
