@@ -1,6 +1,31 @@
 {
-  "last_updated": "2026-08-29T15:36:11.581721+09:00",
-  "date_range": "2026-08-24 to 2026-08-28",
-  "total_universities": 0,
-  "status_list": []
+  "last_updated": "2026-09-05T12:53:38.508221+09:00",
+  "date_range": "2026-08-31 to 2026-09-04",
+  "total_universities": 3,
+  "status_list": [
+    {
+      "university": "경기대학교",
+      "period": "26.09.02~26.09.17",
+      "links": [
+        "https://m.hibrain.net/recruitment/categories/ARAGP/categories/ARA01/recruits/3596697?pagekey=3596697&listType=ING&pagesize=5&sortType=SORTDTM&cntType=ARAGP&limit=25&displayType=TIT&siteid=1&page=1"
+      ],
+      "detected_at": "2026-09-04T09:52:58+09:00"
+    },
+    {
+      "university": "아주대학교",
+      "period": "26.09.02~26.09.18",
+      "links": [
+        "https://m.hibrain.net/recruitment/recruits/3596647?pagekey=3596647&listType=RECOMM&pagesize=5&sortType=AD&limit=25&displayType=TIT&siteid=1&page=1"
+      ],
+      "detected_at": "2026-09-04T09:52:58+09:00"
+    },
+    {
+      "university": "용인대학교",
+      "period": "26.08.26~26.09.09",
+      "links": [
+        "https://m.hibrain.net/recruitment/categories/ARAGP/categories/ARA01/recruits/3596288?pagekey=3596288&listType=ING&pagesize=5&sortType=SORTDTM&cntType=ARAGP&limit=25&displayType=TIT&siteid=1&page=1"
+      ],
+      "detected_at": "2026-09-02T09:55:21+09:00"
+    }
+  ]
 }
