@@ -1,23 +1,15 @@
 {
-  "last_updated": "2026-09-19T13:04:20.244291+09:00",
-  "date_range": "2026-09-14 to 2026-09-18",
-  "total_universities": 2,
+  "last_updated": "2026-09-26T13:27:14.119456+09:00",
+  "date_range": "2026-09-21 to 2026-09-25",
+  "total_universities": 1,
   "status_list": [
     {
-      "university": "경희대학교",
-      "period": "26.09.03~26.09.20",
+      "university": "용인대학교",
+      "period": "26.09.18~26.09.30",
       "links": [
-        "https://m.hibrain.net/recruitment/recruits/3596984?pagekey=3596984&listType=RECOMM&pagesize=5&sortType=AD&limit=25&displayType=TIT&siteid=1&page=1"
+        "https://m.hibrain.net/recruitment/categories/ARAGP/categories/ARA01/recruits/3598864?pagekey=3598864&listType=ING&pagesize=5&sortType=SORTDTM&cntType=ARAGP&limit=25&displayType=TIT&siteid=1&page=1"
       ],
-      "detected_at": "2026-09-18T10:08:47+09:00"
-    },
-    {
-      "university": "아주대학교",
-      "period": "26.09.02~오늘마감",
-      "links": [
-        "https://m.hibrain.net/recruitment/recruits/3596647?pagekey=3596647&listType=RECOMM&pagesize=5&sortType=AD&limit=25&displayType=TIT&siteid=1&page=1"
-      ],
-      "detected_at": "2026-09-18T10:08:47+09:00"
+      "detected_at": "2026-09-25T10:18:21+09:00"
     }
   ]
 }
