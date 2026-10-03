@@ -1,15 +1,40 @@
 {
-  "last_updated": "2026-09-26T13:27:14.119456+09:00",
-  "date_range": "2026-09-21 to 2026-09-25",
-  "total_universities": 1,
+  "last_updated": "2026-10-03T13:45:59.004730+09:00",
+  "date_range": "2026-09-28 to 2026-10-02",
+  "total_universities": 4,
   "status_list": [
     {
-      "university": "용인대학교",
-      "period": "26.09.18~26.09.30",
+      "university": "경기대학교",
+      "period": "26.10.01~26.10.12",
       "links": [
-        "https://m.hibrain.net/recruitment/categories/ARAGP/categories/ARA01/recruits/3598864?pagekey=3598864&listType=ING&pagesize=5&sortType=SORTDTM&cntType=ARAGP&limit=25&displayType=TIT&siteid=1&page=1"
+        "https://m.hibrain.net/recruitment/categories/ARAGP/categories/ARA01/recruits/3600299?pagekey=3600299&listType=ING&pagesize=5&sortType=SORTDTM&cntType=ARAGP&limit=25&displayType=TIT&siteid=1&page=1"
       ],
-      "detected_at": "2026-09-25T10:18:21+09:00"
+      "detected_at": "2026-10-02T11:05:01+09:00"
+    },
+    {
+      "university": "경희대학교",
+      "period": "채용시까지",
+      "links": [
+        "https://m.hibrain.net/recruitment/recruits/3598314?pagekey=3598314&listType=RECOMM&pagesize=5&sortType=AD&limit=25&displayType=TIT&siteid=1&page=1"
+      ],
+      "detected_at": "2026-10-02T11:05:01+09:00"
+    },
+    {
+      "university": "아주대학교",
+      "period": "26.09.30~26.10.07",
+      "links": [
+        "https://m.hibrain.net/recruitment/categories/ARAGP/categories/ARA01/recruits/3600111?pagekey=3600111&listType=ING&pagesize=5&sortType=SORTDTM&cntType=ARAGP&limit=25&displayType=TIT&siteid=1&page=1",
+        "https://m.hibrain.net/recruitment/categories/ARAGP/categories/ARA01/recruits/3600109?pagekey=3600109&listType=ING&pagesize=5&sortType=SORTDTM&cntType=ARAGP&limit=25&displayType=TIT&siteid=1&page=1"
+      ],
+      "detected_at": "2026-10-01T10:55:35+09:00"
+    },
+    {
+      "university": "용인대학교",
+      "period": "26.09.18~오늘마감",
+      "links": [
+        "https://m.hibrain.net/recruitment/recruits/3598864?pagekey=3598864&listType=RECOMM&pagesize=5&sortType=AD&limit=25&displayType=TIT&siteid=1&page=1"
+      ],
+      "detected_at": "2026-09-30T10:55:09+09:00"
     }
   ]
 }
