@@ -31,6 +31,13 @@ MAX_LINKS = CONFIG.get("max_links", 2)
 #  - include: 제목에 아래 단어 중 하나 이상이 있어야 함 (교수/교원 채용 신호)
 #  - exclude: 아래 단어가 제목에 있으면 교수 임용이 아니라고 보고 제외
 #    (Post-Doc/박사후연구원, 시간강사 등 비전임 직군)
+#
+#  ※ 산학 교수 채용 포함 여부:
+#    "산학협력중점교수", "산학중점교수", "산학협력교수", "겸임교수(산학)" 등은
+#    모두 "교수"(또는 "교원")를 제목에 포함하므로 include 조건을 만족해 수집된다.
+#    (비전임 형태의 산학협력중점교수도 포함) 반면 "산학장학생", "산학협력단 직원"
+#    처럼 교수/교원이 아닌 공고는 include 신호가 없어 자연히 제외된다.
+#    → 이 동작은 test_faculty_filter.py 회귀 테스트로 고정되어 있다.
 FACULTY_INCLUDE_TERMS = CONFIG.get("faculty_include_terms") or ["교수", "교원", "초빙", "임용"]
 FACULTY_EXCLUDE_TERMS = CONFIG.get("faculty_exclude_terms") or [
     "Post-Doc", "Postdoc", "Post Doc", "포닥", "박사후", "시간강사",
