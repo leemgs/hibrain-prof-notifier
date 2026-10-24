@@ -1,23 +1,24 @@
 {
-  "last_updated": "2026-10-17T12:51:38.334772+09:00",
-  "date_range": "2026-10-12 to 2026-10-16",
-  "total_universities": 4,
+  "last_updated": "2026-10-24T13:04:33.799704+09:00",
+  "date_range": "2026-10-19 to 2026-10-23",
+  "total_universities": 3,
   "status_list": [
     {
       "university": "경희대학교",
-      "period": "채용시까지",
+      "period": "26.10.22~26.11.03",
       "links": [
-        "https://m.hibrain.net/recruitment/recruits/3598314?pagekey=3598314&listType=RECOMM&pagesize=5&sortType=AD&limit=25&displayType=TIT&siteid=1&page=1"
+        "https://m.hibrain.net/recruitment/recruits/3602646?pagekey=3602646&listType=RECOMM&pagesize=5&sortType=AD&limit=25&displayType=TIT&siteid=1&page=1",
+        "https://m.hibrain.net/recruitment/recruits/3602610?pagekey=3602610&listType=RECOMM&pagesize=5&sortType=AD&limit=25&displayType=TIT&siteid=1&page=1"
       ],
-      "detected_at": "2026-10-12T11:11:51+09:00"
+      "detected_at": "2026-10-23T10:21:17+09:00"
     },
     {
       "university": "명지대학교",
-      "period": "26.10.12~26.10.23",
+      "period": "26.10.12~오늘마감",
       "links": [
         "https://m.hibrain.net/recruitment/recruits/3600636?pagekey=3600636&listType=RECOMM&pagesize=5&sortType=AD&limit=25&displayType=TIT&siteid=1&page=1"
       ],
-      "detected_at": "2026-10-16T10:04:50+09:00"
+      "detected_at": "2026-10-23T10:21:17+09:00"
     },
     {
       "university": "아주대학교",
@@ -25,15 +26,7 @@
       "links": [
         "https://m.hibrain.net/recruitment/recruits/3601681?pagekey=3601681&listType=RECOMM&pagesize=5&sortType=AD&limit=25&displayType=TIT&siteid=1&page=1"
       ],
-      "detected_at": "2026-10-16T10:04:50+09:00"
-    },
-    {
-      "university": "한신대학교",
-      "period": "26.10.15~26.10.19",
-      "links": [
-        "https://m.hibrain.net/recruitment/categories/ARAGP/categories/ARA01/recruits/3602000?pagekey=3602000&listType=ING&pagesize=5&sortType=SORTDTM&cntType=ARAGP&limit=25&displayType=TIT&siteid=1&page=1"
-      ],
-      "detected_at": "2026-10-16T10:04:50+09:00"
+      "detected_at": "2026-10-23T10:21:17+09:00"
     }
   ]
 }
