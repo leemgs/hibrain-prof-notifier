@@ -237,6 +237,7 @@ python main.py
 ```bash
 추천 해결책 순위
   * self-hosted runner 사용 (집 PC, NAS 등): → IP 고정 → 403 발생률 최저 수준
+    (상시 운영 방법은 아래 「Self-hosted Runner를 systemd 서비스로 등록하기」 참조)
   * 실행 시간 변경: 예: 매일 일찍 새벽 → 트래픽 낮은 시간
   * 요청 횟수 줄임 (현재는 적절함)
 ```
@@ -337,6 +338,103 @@ jobs:
 ### 2) 주간 요약 — `.github/workflows/weekly-summary.yml`
 
 매주 토요일 KST 09:00(UTC 00:00)에 실행되어 직전 월~금 알림을 집계하고 `data/university_hiring_status.json`을 자동 커밋·푸시합니다. (자세한 내용은 아래 **「주간 채용 공지 현황 요약 및 자동 커밋」** 섹션 참조)
+
+---
+
+## 🖥 Self-hosted Runner를 systemd 서비스로 등록하기
+
+두 워크플로우 모두 `runs-on: self-hosted` 로 동작하므로, 집 PC·NAS·서버 등에 **GitHub Actions self-hosted runner**가 상시 떠 있어야 스케줄(cron)이 정상적으로 실행됩니다. 터미널을 닫아도 runner가 계속 살아있고, 재부팅·비정상 종료 시 자동으로 다시 뜨도록 **systemd 서비스**로 등록하는 방법을 정리합니다.
+
+> 💡 self-hosted runner는 **IP가 고정**되어 Hibrain 서버의 403 발생률을 가장 낮게 유지할 수 있습니다. (위 **「주요 기술 요소 → 403 방지 로직」** 참조)
+
+### 1) Runner 설치
+
+저장소의 **Settings → Actions → Runners → New self-hosted runner** 안내에 따라 runner를 내려받아 설정합니다. 아래 예시는 `invain` 사용자의 `/var/www/invain/github-actions/hibrain-prof-notifier` 경로에 설치했다고 가정합니다.
+
+```bash
+# 예시 경로 — 실제 설치 경로에 맞게 조정하세요
+cd /var/www/invain/github-actions/hibrain-prof-notifier
+./config.sh --url https://github.com/leemgs/hibrain-prof-notifier --token <RUNNER_TOKEN>
+```
+
+> runner 디렉터리에는 `config.sh`(최초 설정)와 `run.sh`(포그라운드 실행) 스크립트가 함께 생성됩니다. systemd는 이 `run.sh`를 포그라운드로 실행하며 프로세스를 관리합니다.
+
+### 2) systemd 유닛 파일 작성
+
+`/etc/systemd/system/github-actions-runner-hibrain-prof-notifier.service` 파일을 아래 내용으로 생성합니다. **`User`/`Group`/`WorkingDirectory`/`ExecStart` 경로는 runner를 설치한 사용자·경로에 맞게 반드시 수정하세요.**
+
+```ini
+[Unit]
+Description=GitHub Actions Self-hosted Runner (hibrain-prof-notifier)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+
+# ✅ runner가 설치된 사용자/경로에 맞게 수정
+User=invain
+Group=invain
+WorkingDirectory=/var/www/invain/github-actions/hibrain-prof-notifier
+
+# run.sh는 포그라운드로 실행되며 systemd가 프로세스를 관리합니다
+ExecStart=/var/www/invain/github-actions/hibrain-prof-notifier/run.sh
+
+# 비정상 종료 시 자동 재시작
+Restart=always
+RestartSec=10
+
+# 로그는 journald로 쌓임 (journalctl로 확인)
+KillSignal=SIGINT
+TimeoutStopSec=30
+
+# (옵션) 파일 디스크립터/프로세스 제한 완화
+LimitNOFILE=1048576
+
+[Install]
+WantedBy=multi-user.target
+```
+
+| 설정 | 설명 |
+| --- | --- |
+| `After` / `Wants=network-online.target` | 네트워크가 올라온 뒤 runner를 기동 |
+| `User` / `Group` | runner를 설치·실행할 계정 (root 실행 비권장) |
+| `WorkingDirectory` | runner가 설치된 디렉터리 |
+| `ExecStart` | runner 포그라운드 실행 스크립트(`run.sh`)의 절대 경로 |
+| `Restart=always` / `RestartSec=10` | 비정상 종료 시 10초 후 자동 재시작 |
+| `KillSignal=SIGINT` / `TimeoutStopSec=30` | 중지 시 runner에 `SIGINT`를 보내 진행 중 작업을 정상 종료 |
+| `LimitNOFILE` | 파일 디스크립터 제한 완화(옵션) |
+| `WantedBy=multi-user.target` | 부팅 시 자동 시작 등록 대상 |
+
+> ⚠️ runner 공식 설치 스크립트가 제공하는 `svc.sh install` 명령을 사용하면 위와 유사한 서비스가 자동 생성됩니다. 경로·계정을 직접 제어하고 싶을 때 위 유닛 파일을 수동으로 작성하세요. (두 방식을 동시에 등록하면 runner가 중복 실행되니 하나만 사용하세요.)
+
+### 3) 서비스 등록 및 시작
+
+```bash
+# 유닛 파일 변경 사항 반영
+sudo systemctl daemon-reload
+
+# 부팅 시 자동 시작 + 즉시 시작
+sudo systemctl enable --now github-actions-runner-hibrain-prof-notifier.service
+
+# 상태 확인
+systemctl status github-actions-runner-hibrain-prof-notifier.service
+```
+
+### 4) 로그 확인 및 운영
+
+```bash
+# 실시간 로그 보기 (journald)
+journalctl -u github-actions-runner-hibrain-prof-notifier.service -f
+
+# 서비스 재시작 / 중지
+sudo systemctl restart github-actions-runner-hibrain-prof-notifier.service
+sudo systemctl stop github-actions-runner-hibrain-prof-notifier.service
+```
+
+등록이 완료되면 저장소 **Settings → Actions → Runners** 에서 해당 runner가 **`Idle`(초록색)** 상태로 표시되며, 이후 일일 알림·주간 요약 워크플로우가 이 runner에서 자동으로 실행됩니다.
+
+> 🔐 `GMAIL_APP_PASSWORD` 등 비밀 값은 self-hosted runner라 하더라도 유닛 파일이나 저장소 코드에 직접 넣지 말고 **GitHub Secrets**로 주입하세요. (워크플로우의 `env:` 참조)
 
 ---
 
