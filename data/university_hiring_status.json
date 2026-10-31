@@ -1,32 +1,89 @@
 {
-  "last_updated": "2026-10-24T13:04:33.799704+09:00",
-  "date_range": "2026-10-19 to 2026-10-23",
-  "total_universities": 3,
+  "last_updated": "2026-10-31T13:57:27.907527+09:00",
+  "date_range": "2026-10-26 to 2026-10-30",
+  "total_universities": 10,
   "status_list": [
     {
       "university": "경희대학교",
       "period": "26.10.22~26.11.03",
       "links": [
         "https://m.hibrain.net/recruitment/recruits/3602646?pagekey=3602646&listType=RECOMM&pagesize=5&sortType=AD&limit=25&displayType=TIT&siteid=1&page=1",
-        "https://m.hibrain.net/recruitment/recruits/3602610?pagekey=3602610&listType=RECOMM&pagesize=5&sortType=AD&limit=25&displayType=TIT&siteid=1&page=1"
+        "https://m.hibrain.net/recruitment/recruits/3603514?pagekey=3603514&listType=RECOMM&pagesize=5&sortType=AD&limit=25&displayType=TIT&siteid=1&page=1"
       ],
-      "detected_at": "2026-10-23T10:21:17+09:00"
+      "detected_at": "2026-10-30T11:28:29+09:00"
     },
     {
-      "university": "명지대학교",
+      "university": "단국대학교",
+      "period": "26.10.15~오늘마감",
+      "links": [
+        "https://m.hibrain.net/recruitment/recruits/3602017?pagekey=3602017&listType=RECOMM&pagesize=5&sortType=AD&limit=25&displayType=TIT&siteid=1&page=1"
+      ],
+      "detected_at": "2026-10-30T11:28:29+09:00"
+    },
+    {
+      "university": "동남보건대학교",
       "period": "26.10.12~오늘마감",
       "links": [
-        "https://m.hibrain.net/recruitment/recruits/3600636?pagekey=3600636&listType=RECOMM&pagesize=5&sortType=AD&limit=25&displayType=TIT&siteid=1&page=1"
+        "https://m.hibrain.net/recruitment/recruits/3601482?pagekey=3601482&listType=RECOMM&pagesize=5&sortType=AD&limit=25&displayType=TIT&siteid=1&page=1"
       ],
-      "detected_at": "2026-10-23T10:21:17+09:00"
+      "detected_at": "2026-10-27T10:55:39+09:00"
+    },
+    {
+      "university": "성균관대학교",
+      "period": "26.10.29~26.11.10",
+      "links": [
+        "https://m.hibrain.net/recruitment/recruits/3603942?pagekey=3603942&listType=RECOMM&pagesize=5&sortType=AD&limit=25&displayType=TIT&siteid=1&page=1",
+        "https://m.hibrain.net/recruitment/recruits/3601776?pagekey=3601776&listType=RECOMM&pagesize=5&sortType=AD&limit=25&displayType=TIT&siteid=1&page=1"
+      ],
+      "detected_at": "2026-10-30T11:28:29+09:00"
     },
     {
       "university": "아주대학교",
-      "period": "26.10.13~26.10.27",
+      "period": "26.10.13~오늘마감",
       "links": [
         "https://m.hibrain.net/recruitment/recruits/3601681?pagekey=3601681&listType=RECOMM&pagesize=5&sortType=AD&limit=25&displayType=TIT&siteid=1&page=1"
       ],
-      "detected_at": "2026-10-23T10:21:17+09:00"
+      "detected_at": "2026-10-27T10:55:39+09:00"
+    },
+    {
+      "university": "오산대학교",
+      "period": "26.09.30~오늘마감",
+      "links": [
+        "https://m.hibrain.net/recruitment/recruits/3599967?pagekey=3599967&listType=RECOMM&pagesize=5&sortType=AD&limit=25&displayType=TIT&siteid=1&page=1"
+      ],
+      "detected_at": "2026-10-28T11:05:10+09:00"
+    },
+    {
+      "university": "용인대학교",
+      "period": "26.10.28~26.11.11",
+      "links": [
+        "https://m.hibrain.net/recruitment/categories/ARAGP/categories/ARA01/recruits/3603703?pagekey=3603703&listType=ING&pagesize=5&sortType=SORTDTM&cntType=ARAGP&limit=25&displayType=TIT&siteid=1&page=1"
+      ],
+      "detected_at": "2026-10-29T11:14:42+09:00"
+    },
+    {
+      "university": "용인예술과학대학교",
+      "period": "26.10.27~26.11.10",
+      "links": [
+        "https://m.hibrain.net/recruitment/recruits/3603731?pagekey=3603731&listType=RECOMM&pagesize=5&sortType=AD&limit=25&displayType=TIT&siteid=1&page=1"
+      ],
+      "detected_at": "2026-10-30T11:28:29+09:00"
+    },
+    {
+      "university": "한국외국어대학교",
+      "period": "26.11.06~26.11.12",
+      "links": [
+        "https://m.hibrain.net/recruitment/categories/ARAGP/categories/ARA01/recruits/3603801?pagekey=3603801&listType=ING&pagesize=5&sortType=SORTDTM&cntType=ARAGP&limit=25&displayType=TIT&siteid=1&page=1"
+      ],
+      "detected_at": "2026-10-30T11:28:29+09:00"
+    },
+    {
+      "university": "홍익대학교",
+      "period": "26.10.17~오늘마감",
+      "links": [
+        "https://m.hibrain.net/recruitment/recruits/3601376?pagekey=3601376&listType=RECOMM&pagesize=5&sortType=AD&limit=25&displayType=TIT&siteid=1&page=1"
+      ],
+      "detected_at": "2026-10-26T10:04:08+09:00"
     }
   ]
 }
