@@ -1,31 +1,15 @@
 {
-  "last_updated": "2026-11-14T09:27:45.303942+09:00",
-  "date_range": "2026-11-09 to 2026-11-13",
-  "total_universities": 6,
+  "last_updated": "2026-11-21T15:33:33.958583+09:00",
+  "date_range": "2026-11-16 to 2026-11-20",
+  "total_universities": 3,
   "status_list": [
-    {
-      "university": "경희대학교",
-      "period": "26.11.11~26.12.04",
-      "links": [
-        "https://m.hibrain.net/recruitment/categories/ARAGP/categories/ARA01/recruits/3605881?pagekey=3605881&listType=ING&pagesize=5&sortType=SORTDTM&cntType=ARAGP&limit=25&displayType=TIT&siteid=1&page=1"
-      ],
-      "detected_at": "2026-11-13T12:19:15+09:00"
-    },
-    {
-      "university": "성균관대학교",
-      "period": "26.11.03~오늘마감",
-      "links": [
-        "https://m.hibrain.net/recruitment/recruits/3604676?pagekey=3604676&listType=RECOMM&pagesize=5&sortType=AD&limit=25&displayType=TIT&siteid=1&page=1"
-      ],
-      "detected_at": "2026-11-12T12:41:43+09:00"
-    },
     {
       "university": "아주대학교",
       "period": "26.11.02~26.11.23",
       "links": [
         "https://m.hibrain.net/recruitment/recruits/3604463?pagekey=3604463&listType=RECOMM&pagesize=5&sortType=AD&limit=25&displayType=TIT&siteid=1&page=1"
       ],
-      "detected_at": "2026-11-13T12:19:15+09:00"
+      "detected_at": "2026-11-20T12:54:57+09:00"
     },
     {
       "university": "용인대학교",
@@ -33,23 +17,15 @@
       "links": [
         "https://m.hibrain.net/recruitment/recruits/3605279?pagekey=3605279&listType=RECOMM&pagesize=5&sortType=AD&limit=25&displayType=TIT&siteid=1&page=1"
       ],
-      "detected_at": "2026-11-13T12:19:15+09:00"
-    },
-    {
-      "university": "용인예술과학대학교",
-      "period": "26.10.27~오늘마감",
-      "links": [
-        "https://m.hibrain.net/recruitment/recruits/3603731?pagekey=3603731&listType=RECOMM&pagesize=5&sortType=AD&limit=25&displayType=TIT&siteid=1&page=1"
-      ],
-      "detected_at": "2026-11-10T13:32:10+09:00"
+      "detected_at": "2026-11-20T12:54:57+09:00"
     },
     {
       "university": "한국외국어대학교",
-      "period": "26.11.06~내일마감",
+      "period": "26.11.16~26.11.20",
       "links": [
-        "https://m.hibrain.net/recruitment/recruits/3603801?pagekey=3603801&listType=RECOMM&pagesize=5&sortType=AD&limit=25&displayType=TIT&siteid=1&page=1"
+        "https://m.hibrain.net/recruitment/categories/ARAGP/categories/ARA01/recruits/3606176?pagekey=3606176&listType=ING&pagesize=5&sortType=SORTDTM&cntType=ARAGP&limit=25&displayType=TIT&siteid=1&page=1"
       ],
-      "detected_at": "2026-11-11T11:38:38+09:00"
+      "detected_at": "2026-11-17T13:59:49+09:00"
     }
   ]
 }
